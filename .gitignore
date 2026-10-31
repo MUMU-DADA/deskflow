@@ -13,6 +13,7 @@
 /.cache
 /.venv
 aqtinstall.log
+__pycache__/
 Brewfile.lock.json
 
 # typical developer-created files
