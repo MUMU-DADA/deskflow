@@ -29,9 +29,14 @@ jobs:
         with:
           qt-version: 6.9.3
           vcpkg-triplet: x64-windows-release
-      - name: Configure
+      - name: Configure Windows
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DBUILD_INSTALLER=OFF -DSKIP_BUILD_TESTS=ON "-DCMAKE_TOOLCHAIN_FILE=$env:GITHUB_WORKSPACE/vcpkg/scripts/buildsystems/vcpkg.cmake" -DVCPKG_TARGET_TRIPLET=x64-windows-release -DVCPKG_MANIFEST_MODE=OFF
+      - name: Configure macOS
+        if: runner.os == 'macOS'
         shell: bash
-        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_INSTALLER=OFF -DSKIP_BUILD_TESTS=ON ${{ steps.deps.outputs.vcpkg-cmake-config }}
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_INSTALLER=OFF -DSKIP_BUILD_TESTS=ON
       - name: Build
         run: cmake --build build --config Release --parallel 4
       - name: Tests
