@@ -134,6 +134,7 @@ void MacCoreApplicationTests::actualCoreEarlyExit()
   const auto child = runChild(QStringList{"--core-entry-child"} + args);
   QVERIFY2(child.finished, child.errors.constData());
   QCOMPARE(child.exitCode, 0);
+  QVERIFY2(!child.errors.contains("became a foreground application"), child.errors.constData());
   QCOMPARE(child.state.value("coreExit").toInt(-1), expectedExit);
   QCOMPARE(child.state.value("policy").toInt(-1), static_cast<int>(NSApplicationActivationPolicyProhibited));
   QVERIFY(!child.state.value("environmentSet").toBool());
