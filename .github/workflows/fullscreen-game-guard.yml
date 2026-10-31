@@ -36,21 +36,30 @@ jobs:
       - name: Configure macOS
         if: runner.os == 'macOS'
         shell: bash
-        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_INSTALLER=OFF -DSKIP_BUILD_TESTS=ON
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_INSTALLER=OFF -DSKIP_BUILD_TESTS=ON -DCMAKE_OSX_ARCHITECTURES=arm64 -DCMAKE_OSX_DEPLOYMENT_TARGET=13.0
       - name: Build
         run: cmake --build build --config Release --parallel 4
       - name: Tests
         env:
           QT_QPA_PLATFORM: offscreen
         run: ctest --test-dir build/src/unittests -C Release --output-on-failure
+      - name: Package Windows portable test build
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: ./deploy/testing/package_windows.ps1 -BuildDirectory build -OutputDirectory dist-test -OpenSslBin "$env:GITHUB_WORKSPACE/vcpkg/installed/x64-windows-release/bin"
+      - name: Package macOS standalone test apps
+        if: runner.os == 'macOS'
+        shell: bash
+        run: bash deploy/testing/package_macos.sh "$GITHUB_WORKSPACE/build" "$GITHUB_WORKSPACE/dist-test"
       - uses: actions/upload-artifact@v4
         with:
-          name: deskflow-${{ matrix.os }}-fullscreen-game-guard
+          name: deskflow-${{ matrix.os }}-fullscreen-game-guard-test-package
+          if-no-files-found: error
           path: |
-            build/bin/
-            !build/bin/**/*.pdb
-            !build/bin/**/*.lib
-            !build/bin/**/*.exp
+            dist-test/*.zip
+            dist-test/*.tar.gz
+            dist-test/*.sha256
+            dist-test/probe-smoke.ndjson
       - uses: actions/upload-artifact@v4
         if: always()
         with:

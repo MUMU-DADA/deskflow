@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- SPDX-FileCopyrightText: (C) 2026 Deskflow Developers -->
+<!-- SPDX-License-Identifier: MIT -->
+<plist version="1.0">
+<dict>
+  <key>CFBundleExecutable</key><string>deskflow-game-probe</string>
+  <key>CFBundleIdentifier</key><string>org.deskflow.game-probe</string>
+  <key>CFBundleName</key><string>Deskflow Game Probe</string>
+  <key>CFBundleDisplayName</key><string>Deskflow Game Probe</string>
+  <key>CFBundlePackageType</key><string>APPL</string>
+  <key>CFBundleInfoDictionaryVersion</key><string>6.0</string>
+  <key>CFBundleShortVersionString</key><string>1.0</string>
+  <key>CFBundleVersion</key><string>1</string>
+  <key>LSUIElement</key><true/>
+  <key>NSHighResolutionCapable</key><true/>
+  <key>LSApplicationCategoryType</key><string>public.app-category.utilities</string>
+</dict>
+</plist>

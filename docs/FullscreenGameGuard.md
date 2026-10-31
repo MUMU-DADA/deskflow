@@ -72,6 +72,55 @@ can affect edge switching, including delayed and double-tap switching paths.
 
 ## Validation before release
 
+### Standalone native detector probe
+
+The prebuilt **Deskflow Game Probe** runs the same native detector without starting
+the Deskflow core, installing input hooks, changing existing settings, or requesting
+permissions. It creates no window and does not activate itself. The probe is a
+separate application with bundle ID `org.deskflow.game-probe` on macOS; it does not
+inherit Deskflow's Accessibility permission. Missing permission is reported as
+`supported: false`, without opening a permission dialog. The Mac needs only the
+prebuilt bundle, not an SDK or development tools.
+
+Windows executable: `deskflow-game-probe.exe`. The packaged Mac executable is
+`Deskflow Game Probe.app/Contents/MacOS/deskflow-game-probe`. Run `--help` or
+`--version` without inspecting the desktop. For example:
+
+```text
+deskflow-game-probe --samples 120 --interval-ms 500 --game-app game.exe --output game-probe.jsonl
+```
+
+On macOS, launch the bundle in the background so the tested game keeps focus:
+
+```sh
+open -W --background "Deskflow Game Probe.app" --args \
+  --samples 120 --interval-ms 500 \
+  --game-app com.example.game --output "$PWD/game-probe.jsonl"
+```
+
+`--game-app` is repeatable and accepts exact names, paths or application IDs.
+Only explicitly supplied rules and native heuristics are used; the probe never
+reads Deskflow preferences. `--state-file` optionally selects an existing Wayland
+integration file. Linux inspection permits local desktop IPC but refuses remote
+X11 display connections.
+
+Each observation is one JSON line with `supported`, `fullscreen`, `game`, `guard`,
+`application`, `detail` and a UTC `timestamp`. `guard` means the detector would
+request automatic protection; it does not mean input is currently locked or that
+this device is the active Deskflow device. The probe does not connect to a Deskflow
+server or change input behavior. Output goes to stdout unless `--output` is given;
+that option creates a new file and refuses to overwrite an existing one.
+
+The default is one sample, with a 500 ms interval when collecting multiple
+samples. Counts are limited to 1–1200, intervals to 100–60000 ms, and the scheduled
+run (including the final query budget) to 15 minutes. A native query has a 1 second
+deadline. If it stalls, the probe flushes an unsupported diagnostic and exits
+instead of leaving a hung background process. Exit codes are 0 for completed
+inspection (including ordinary unsupported states), 2 for invalid arguments,
+74 for output errors and 75 for timeout or native-query failure.
+
+### Integration checks
+
 Automated coverage exercises application matching, display geometry, protocol
 negotiation and stale/inactive client reports. Cross-platform builds run in the
 `Fullscreen game guard` workflow. These checks do not replace physical testing:

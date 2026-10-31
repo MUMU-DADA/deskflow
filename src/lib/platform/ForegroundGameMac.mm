@@ -125,6 +125,12 @@ ForegroundGameState queryForegroundGame(const QStringList &gameApps, const QStri
     bool nativeFullscreen = false;
     bool decorated = false;
     bool decorationKnown = false;
+    // Check passively: the standalone probe must never request or change TCC grants.
+    if (!AXIsProcessTrusted()) {
+      state.supported = false;
+      state.detail = QStringLiteral("Accessibility permission is missing for this application");
+      return state;
+    }
     if (!focusedWindowBounds(pid, bounds, nativeFullscreen, decorated, decorationKnown)) {
       state.supported = false;
       state.detail = QStringLiteral("Foreground window is not accessible; fullscreen game protection is unavailable");
