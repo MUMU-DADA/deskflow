@@ -22,6 +22,10 @@ private Q_SLOTS:
   void keyRepeat();
   void keyUp_data();
   void keyUp();
+  void fullscreenGameGuardRequiresCapability();
+  void fullscreenGameGuardTracksActiveVisit();
+  void fullscreenGameGuardRejectsInvalidPayload();
+  void fullscreenGameGuardResetsOnNewConnection();
 
 private:
   Log m_log;

@@ -165,7 +165,9 @@ bool ClientProxy1_0::parseHandshakeMessage(const uint8_t *code)
 
 bool ClientProxy1_0::parseMessage(const uint8_t *code)
 {
-  if (memcmp(code, kMsgDInfo, 4) == 0) {
+  if (memcmp(code, kMsgDFullscreenGameGuard, 4) == 0) {
+    return recvFullscreenGameGuard();
+  } else if (memcmp(code, kMsgDInfo, 4) == 0) {
     if (recvInfo()) {
       m_events->addEvent(Event(EventTypes::ComputerShapeChanged, getEventTarget()));
       return true;
@@ -225,12 +227,20 @@ void ClientProxy1_0::getCursorPos(int32_t &x, int32_t &y) const
 
 void ClientProxy1_0::enter(int32_t xAbs, int32_t yAbs, uint32_t seqNum, KeyModifierMask mask, bool)
 {
+  m_gameGuardSequence = seqNum;
+  m_gameGuardEntered = std::chrono::steady_clock::now();
+  m_gameGuardActive = true;
+  m_gameGuardKnown = false;
+  m_gameGuarded = false;
   LOG_VERBOSE("send enter to \"%s\", %d,%d %d %04x", getName().c_str(), xAbs, yAbs, seqNum, mask);
   ProtocolUtil::writef(getStream(), kMsgCEnter, xAbs, yAbs, seqNum, mask);
 }
 
 bool ClientProxy1_0::leave()
 {
+  m_gameGuardActive = false;
+  m_gameGuardKnown = false;
+  m_gameGuarded = false;
   LOG_VERBOSE("send leave to \"%s\"", getName().c_str());
   ProtocolUtil::writef(getStream(), kMsgCLeave);
 
@@ -338,6 +348,10 @@ void ClientProxy1_0::screensaver(bool on)
 
 void ClientProxy1_0::resetOptions()
 {
+  m_gameGuardAdvertised = false;
+  m_gameGuardCapable = false;
+  m_gameGuardKnown = false;
+  m_gameGuarded = false;
   LOG_VERBOSE("send reset options to \"%s\"", getName().c_str());
   ProtocolUtil::writef(getStream(), kMsgCResetOptions);
 
@@ -359,7 +373,9 @@ void ClientProxy1_0::setOptions(const OptionsList &options)
 
   // check options
   for (uint32_t i = 0, n = (uint32_t)options.size(); i < n; i += 2) {
-    if (options[i] == kOptionHeartbeat) {
+    if (options[i] == kOptionFullscreenGameGuard) {
+      m_gameGuardAdvertised = (options[i + 1] == 1);
+    } else if (options[i] == kOptionHeartbeat) {
       double rate = 1.0e-3 * static_cast<double>(options[i + 1]);
       if (rate <= 0.0) {
         rate = -1.0;
@@ -369,6 +385,34 @@ void ClientProxy1_0::setOptions(const OptionsList &options)
       addHeartbeatTimer();
     }
   }
+}
+
+bool ClientProxy1_0::isForegroundGameGuarded() const
+{
+  // A capable client must report the foreground state for the new enter
+  // sequence before edge crossing is allowed. Explicit hotkeys still work.
+  const bool awaitingObservation = !m_gameGuardKnown &&
+                                   std::chrono::steady_clock::now() - m_gameGuardEntered < std::chrono::seconds(2);
+  return m_gameGuardCapable && m_gameGuardActive && (awaitingObservation || m_gameGuarded);
+}
+
+bool ClientProxy1_0::recvFullscreenGameGuard()
+{
+  uint32_t sequence = 0;
+  uint8_t guarded = 0;
+  if (!m_gameGuardAdvertised ||
+      !ProtocolUtil::readf(getStream(), kMsgDFullscreenGameGuard + 4, &sequence, &guarded) || guarded > 1) {
+    throw BadClientException();
+  }
+
+  m_gameGuardCapable = true;
+  // Reports from a previous visit or an inactive computer cannot unlock the
+  // current visit, nor lock a different computer.
+  if (m_gameGuardActive && sequence == m_gameGuardSequence) {
+    m_gameGuardKnown = true;
+    m_gameGuarded = guarded != 0;
+  }
+  return true;
 }
 
 bool ClientProxy1_0::recvInfo()

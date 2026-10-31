@@ -51,6 +51,12 @@ public:
     return false;
   }
 
+  //! Inhibit automatic edge transitions only; explicit switch commands bypass it.
+  virtual bool isForegroundGameGuarded() const
+  {
+    return false;
+  }
+
   //@}
 
   // IComputer

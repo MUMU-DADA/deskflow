@@ -69,10 +69,14 @@ Client::Client(
   // register suspend/resume event handlers
   m_events->addHandler(EventTypes::ComputerSuspend, getEventTarget(), [this](const auto &) { handleSuspend(); });
   m_events->addHandler(EventTypes::ComputerResume, getEventTarget(), [this](const auto &) { handleResume(); });
+  m_gameGuardTimer = m_events->newTimer(0.1, nullptr);
+  m_events->addHandler(EventTypes::Timer, m_gameGuardTimer, [this](const auto &) { reportFullscreenGameGuard(); });
 }
 
 Client::~Client()
 {
+  m_events->removeHandler(EventTypes::Timer, m_gameGuardTimer);
+  m_events->deleteTimer(m_gameGuardTimer);
   m_events->removeHandler(EventTypes::ComputerSuspend, getEventTarget());
   m_events->removeHandler(EventTypes::ComputerResume, getEventTarget());
 
@@ -174,6 +178,7 @@ void Client::handshakeComplete()
     saveRelativeRestorePosition();
   }
   sendEvent(EventTypes::ClientConnected);
+  reportFullscreenGameGuard();
 }
 
 bool Client::isConnected() const
@@ -216,8 +221,10 @@ void Client::getCursorPos(int32_t &x, int32_t &y) const
   m_computer->getCursorPos(x, y);
 }
 
-void Client::enter(int32_t xAbs, int32_t yAbs, uint32_t, KeyModifierMask mask, bool)
+void Client::enter(int32_t xAbs, int32_t yAbs, uint32_t sequence, KeyModifierMask mask, bool)
 {
+  m_gameGuardSequence = sequence;
+  m_gameGuardReported = false;
   m_active = true;
   if (m_relativeMouseMoves && m_hasRelativeRestorePosition) {
     xAbs = m_relativeRestoreX;
@@ -226,6 +233,7 @@ void Client::enter(int32_t xAbs, int32_t yAbs, uint32_t, KeyModifierMask mask, b
   }
   m_computer->mouseMove(xAbs, yAbs);
   m_computer->enter(mask);
+  reportFullscreenGameGuard();
 }
 
 bool Client::leave()
@@ -234,6 +242,8 @@ bool Client::leave()
     saveRelativeRestorePosition();
   }
   m_active = false;
+  m_gameGuardReported = false;
+  reportFullscreenGameGuard();
 
   m_computer->leave();
 
@@ -315,6 +325,8 @@ void Client::screensaver(bool activate)
 
 void Client::resetOptions()
 {
+  m_gameGuardProtocol = false;
+  m_gameGuardReported = false;
   m_relativeMouseMoves = false;
   m_hasRelativeRestorePosition = false;
   m_computer->resetOptions();
@@ -327,28 +339,23 @@ void Client::setOptions(const OptionsList &options)
     return;
   }
 
-  for (auto index = options.begin(); index != options.end(); ++index) {
-    const OptionID id = *index;
-    if (id == kOptionClipboardSharing) {
-      index++;
-      if (index != options.end()) {
-        if (!*index) {
-          LOG_INFO("clipboard sharing disabled by server");
-        }
-        m_enableClipboard = *index;
+  for (size_t index = 0; index < options.size(); index += 2) {
+    const OptionID id = options[index];
+    const auto value = options[index + 1];
+    if (id == kOptionFullscreenGameGuard) {
+      m_gameGuardProtocol = (value == 1);
+      m_gameGuardReported = false;
+    } else if (id == kOptionClipboardSharing) {
+      if (!value) {
+        LOG_INFO("clipboard sharing disabled by server");
       }
+      m_enableClipboard = value;
     } else if (id == kOptionClipboardSharingSize) {
-      index++;
-      if (index != options.end()) {
-        m_maximumClipboardSize = *index;
-      }
+      m_maximumClipboardSize = value;
     } else if (id == kOptionRelativeMouseMoves) {
-      index++;
-      if (index != options.end()) {
-        m_relativeMouseMoves = (*index != 0);
-        if (m_relativeMouseMoves && m_ready && !m_hasRelativeRestorePosition) {
-          saveRelativeRestorePosition();
-        }
+      m_relativeMouseMoves = (value != 0);
+      if (m_relativeMouseMoves && m_ready && !m_hasRelativeRestorePosition) {
+        saveRelativeRestorePosition();
       }
     }
   }
@@ -359,6 +366,21 @@ void Client::setOptions(const OptionsList &options)
   }
 
   m_computer->setOptions(options);
+  reportFullscreenGameGuard();
+}
+
+void Client::reportFullscreenGameGuard()
+{
+  // Never send an extension packet to a peer that has not advertised it.
+  if (!m_server || !m_ready || !m_gameGuardProtocol) {
+    return;
+  }
+  const bool guarded = m_active && m_computer->isForegroundGameGuarded();
+  if (!m_gameGuardReported || guarded != m_lastGameGuard) {
+    m_server->onFullscreenGameGuardChanged(m_gameGuardSequence, guarded);
+    m_lastGameGuard = guarded;
+    m_gameGuardReported = true;
+  }
 }
 
 void Client::saveRelativeRestorePosition()
@@ -539,6 +561,10 @@ void Client::cleanupConnection()
 
 void Client::cleanupComputer()
 {
+  m_gameGuardProtocol = false;
+  m_gameGuardReported = false;
+  m_gameGuardSequence = 0;
+  m_active = false;
   if (m_server != nullptr) {
     if (m_ready) {
       m_computer->disable();

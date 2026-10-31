@@ -40,6 +40,7 @@ private:
   void setLogToFile(bool logToFile);
   void accept() override;
   bool isClientMode() const;
+  QStringList gameApplications() const;
   void updateTlsControls();
   void updateTlsControlsEnabled();
   void resetAllSettings();

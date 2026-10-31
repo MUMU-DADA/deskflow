@@ -7,6 +7,10 @@
 
 #pragma once
 
+//! Optional client-to-server fullscreen-game state: enter sequence, boolean.
+//! Only sent after FGCP=1 is advertised in DSOP. No base protocol version change.
+extern const char *const kMsgDFullscreenGameGuard;
+
 #include <cstdint>
 /**
  * @file ProtocolTypes.h

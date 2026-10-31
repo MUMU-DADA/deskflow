@@ -12,8 +12,11 @@
 #include "deskflow/KeyTypes.h"
 #include "deskflow/MouseTypes.h"
 #include "deskflow/OptionTypes.h"
+#include "platform/ForegroundGame.h"
 
 #include <string>
+#include <chrono>
+#include <future>
 
 class IClipboard;
 class IPlatformComputer;
@@ -237,6 +240,9 @@ public:
   */
   bool isLockedToComputer() const;
 
+  //! Whether the local foreground game requests automatic edge-switch inhibition.
+  bool isForegroundGameGuarded() const;
+
   //! Get jump zone size
   /*!
   Return the jump zone size, the size of the regions on the edges of
@@ -291,6 +297,23 @@ protected:
   void leaveSecondary();
 
 private:
+  void invalidateForegroundGameGuard() const;
+
+  // The native detector may perform IPC (notably macOS accessibility). Keep
+  // one query off the input event loop, and discard observations from old visits.
+  mutable std::future<ForegroundGameState> m_gameGuardQuery;
+  mutable bool m_gameGuardValid = false;
+  mutable bool m_cachedGameGuard = false;
+  mutable bool m_gameGuardEnabled = false;
+  mutable QStringList m_gameGuardApps;
+  mutable QString m_gameGuardStateFile;
+  mutable QString m_gameGuardDiagnostic;
+  mutable uint64_t m_gameGuardGeneration = 0;
+  mutable uint64_t m_gameGuardQueryGeneration = 0;
+  mutable std::chrono::steady_clock::time_point m_gameGuardQueryStarted{};
+  mutable std::chrono::steady_clock::time_point m_gameGuardObserved{};
+  mutable std::chrono::steady_clock::time_point m_gameGuardInvalidated = std::chrono::steady_clock::now();
+
   // our platform dependent computer
   IPlatformComputer *m_computer = nullptr;
 

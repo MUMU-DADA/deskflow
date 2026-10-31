@@ -12,6 +12,8 @@
 #include "deskflow/ProtocolTypes.h"
 #include "server/ClientProxy.h"
 
+#include <chrono>
+
 class Event;
 class EventQueueTimer;
 class IEventQueue;
@@ -32,6 +34,7 @@ public:
   bool getClipboard(ClipboardID id, IClipboard *) const override;
   void getShape(int32_t &x, int32_t &y, int32_t &width, int32_t &height) const override;
   void getCursorPos(int32_t &x, int32_t &y) const override;
+  bool isForegroundGameGuarded() const override;
 
   // IClient overrides
   void enter(int32_t xAbs, int32_t yAbs, uint32_t seqNum, KeyModifierMask mask, bool forScreensaver) override;
@@ -77,6 +80,7 @@ private:
 
   bool recvInfo();
   bool recvGrabClipboard();
+  bool recvFullscreenGameGuard();
 
 protected:
   struct ClientClipboard
@@ -96,6 +100,14 @@ private:
   using MessageParser = bool (ClientProxy1_0::*)(const uint8_t *);
 
   ClientInfo m_info;
+  // This state belongs to this connection, never to a reusable computer name.
+  bool m_gameGuardAdvertised = false;
+  bool m_gameGuardCapable = false;
+  bool m_gameGuardActive = false;
+  bool m_gameGuardKnown = false;
+  bool m_gameGuarded = false;
+  uint32_t m_gameGuardSequence = 0;
+  std::chrono::steady_clock::time_point m_gameGuardEntered{};
   double m_heartbeatAlarm;
   EventQueueTimer *m_heartbeatTimer = nullptr;
   MessageParser m_parser = &ClientProxy1_0::parseHandshakeMessage;

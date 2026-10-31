@@ -1,0 +1,7 @@
+{
+  "uuid": "foreground-game-guard@deskflow.local",
+  "name": "Deskflow Foreground Game Guard",
+  "description": "Reports the focused fullscreen game's state to a locally running Deskflow fork.",
+  "shell-version": ["45", "46", "47", "48", "49", "50", "51"],
+  "version": 1
+}

@@ -48,6 +48,9 @@ public:
   };
   struct Core
   {
+    inline static const auto EnableFullscreenGameGuard = QStringLiteral("core/enableFullscreenGameGuard");
+    inline static const auto FullscreenGameApps = QStringLiteral("core/fullscreenGameApps");
+    inline static const auto FullscreenGameStateFile = QStringLiteral("core/fullscreenGameStateFile");
     inline static const auto CoreMode = QStringLiteral("core/coreMode");
     inline static const auto Interface = QStringLiteral("core/interface");
     inline static const auto LastVersion = QStringLiteral("core/lastVersion");
@@ -285,6 +288,9 @@ private:
     , Core::LastVersion
     , Core::Port
     , Core::PreventSleep
+    , Core::EnableFullscreenGameGuard
+    , Core::FullscreenGameApps
+    , Core::FullscreenGameStateFile
     , Core::ProcessMode
     , Core::EnableEnterCommand
     , Core::EnableExitCommand
@@ -368,6 +374,7 @@ private:
   // When checking the default values this list contains the ones that default to true.
   inline static const QStringList m_defaultTrueValues = {
       Core::UseHooks
+    , Core::EnableFullscreenGameGuard
     , Gui::CloseToTray
     , Gui::CloseReminder
     , Gui::LogExpanded

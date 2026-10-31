@@ -48,6 +48,7 @@ public:
   //@{
 
   void onInfoChanged();
+  void onFullscreenGameGuardChanged(uint32_t sequence, bool guarded);
   bool onGrabClipboard(ClipboardID);
   void onClipboardChanged(ClipboardID, const IClipboard *);
 

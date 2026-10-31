@@ -316,6 +316,8 @@ private:
   void handleMotionSecondaryEvent(const Event &event);
   void handleWheelEvent(const Event &event);
   void handleSwitchWaitTimeout();
+  void refreshFullscreenGameGuard();
+  bool isForegroundGameGuarded() const;
   void handleClientDisconnected(BaseClientProxy *client);
   void handleClientCloseTimeout(BaseClientProxy *client);
   void handleSwitchToComputerEvent(const Event &event);
@@ -391,6 +393,9 @@ private:
   BaseClientProxy *m_switchComputer = nullptr;
   double m_switchWaitDelay = 0.0;
   EventQueueTimer *m_switchWaitTimer = nullptr;
+  EventQueueTimer *m_gameGuardTimer = nullptr;
+  bool m_primaryGameGuarded = false;
+  BaseClientProxy *m_relativeGameGuardClient = nullptr;
 
   // delay for double-tap computer switching
   double m_switchTwoTapDelay = 0.0;

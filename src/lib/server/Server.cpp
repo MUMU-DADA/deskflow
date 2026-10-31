@@ -148,10 +148,15 @@ Server::Server(ServerConfig &config, PrimaryClient *primaryClient, deskflow::Com
     LOG_INFO("default computer lock is on, locking cursor to computer");
     m_lockedToComputer = true;
   }
+  m_gameGuardTimer = m_events->newTimer(0.1, nullptr);
+  m_events->addHandler(EventTypes::Timer, m_gameGuardTimer, [this](const auto &) { refreshFullscreenGameGuard(); });
+  refreshFullscreenGameGuard();
 }
 
 Server::~Server()
 {
+  m_events->removeHandler(EventTypes::Timer, m_gameGuardTimer);
+  m_events->deleteTimer(m_gameGuardTimer);
   // remove event handlers and timers
   using enum EventTypes;
   m_events->removeHandler(KeyStateKeyDown, m_inputFilter);
@@ -340,7 +345,7 @@ uint32_t Server::getActivePrimarySides() const
   using enum DirectionMask;
   using enum Direction;
   uint32_t sides = 0;
-  if (!isLockedToComputerServer()) {
+  if (!isLockedToComputerServer() && !m_primaryGameGuarded) {
     if (hasAnyNeighbor(m_primaryClient, Left)) {
       sides |= static_cast<int>(LeftMask);
     }
@@ -361,6 +366,31 @@ bool Server::isLockedToComputerServer() const
 {
   // locked if scroll-lock is toggled on
   return m_lockedToComputer;
+}
+
+bool Server::isForegroundGameGuarded() const
+{
+  return m_active == m_primaryClient ? m_primaryGameGuarded : m_active->isForegroundGameGuarded();
+}
+
+void Server::refreshFullscreenGameGuard()
+{
+  // Only the computer receiving keyboard/mouse input can request this lock.
+  const bool guarded = m_active == m_primaryClient && m_computer->isForegroundGameGuarded();
+  if (guarded != m_primaryGameGuarded) {
+    m_primaryGameGuarded = guarded;
+    // Disable the low-level jump zones too, so Windows does not eat game
+    // mouse events at the edge while the server rejects the transition.
+    m_primaryClient->reconfigure(getActivePrimarySides());
+  }
+  const bool activeGuarded = isForegroundGameGuarded();
+  if (!activeGuarded && m_relativeGameGuardClient == m_active && !isLockedToComputerServer()) {
+    stopRelativeMoves();
+  }
+  m_relativeGameGuardClient = activeGuarded && m_active != m_primaryClient ? m_active : nullptr;
+  if (activeGuarded) {
+    stopSwitch();
+  }
 }
 
 bool Server::isLockedToComputer() const
@@ -491,6 +521,7 @@ void Server::switchComputer(BaseClientProxy *dst, int32_t x, int32_t y, bool for
 
     // enter new computer
     m_active->enter(x, y, m_seqNum, m_primaryClient->getToggleMask(), forScreensaver);
+    refreshFullscreenGameGuard();
 
     if (m_enableClipboard) {
       // send the clipboard data to new active computer
@@ -785,6 +816,11 @@ bool Server::isSwitchOkay(
     BaseClientProxy *newComputer, Direction dir, int32_t x, int32_t y, int32_t xActive, int32_t yActive
 )
 {
+  refreshFullscreenGameGuard();
+  if (isForegroundGameGuarded()) {
+    stopSwitch();
+    return false;
+  }
   LOG_VERBOSE("try to leave \"%s\" on %s", getName(m_active).c_str(), Config::dirName(dir));
 
   // is there a neighbor?
@@ -1074,6 +1110,10 @@ void Server::sendOptions(BaseClientProxy *client) const
   }
 
   // send the options
+  // Unknown option IDs are ignored by legacy clients. Only a client that sees
+  // this capability may send DFSG; do not change Synergy/Barrier wire versions.
+  optionsList.push_back(kOptionFullscreenGameGuard);
+  optionsList.push_back(1);
   client->resetOptions();
   client->setOptions(optionsList);
 }
@@ -1275,6 +1315,11 @@ void Server::handleWheelEvent(const Event &event)
 
 void Server::handleSwitchWaitTimeout()
 {
+  refreshFullscreenGameGuard();
+  if (isForegroundGameGuarded() || m_switchComputer == nullptr) {
+    stopSwitch();
+    return;
+  }
   // ignore if mouse is locked to computer
   if (isLockedToComputer()) {
     LOG_VERBOSE("locked to computer");
@@ -1431,7 +1476,7 @@ void Server::handleLockCursorToComputerEvent(const Event &event)
     LOG_INFO("cursor %s current computer", m_lockedToComputer ? "locked to" : "unlocked from");
 
     m_primaryClient->reconfigure(getActivePrimarySides());
-    if (!isLockedToComputerServer()) {
+    if (!isLockedToComputerServer() && !isForegroundGameGuarded()) {
       stopRelativeMoves();
     }
   }
@@ -1729,13 +1774,15 @@ void Server::onMouseMoveSecondary(int32_t dx, int32_t dy)
     return;
   }
 
+  refreshFullscreenGameGuard();
+
   // if doing relative motion on secondary computers and we're locked
   // to the computer (which activates relative moves) then send a
   // relative mouse motion.  when we're doing this we pretend as if
   // the mouse isn't actually moving because we're expecting some
   // program on the secondary computer to warp the mouse on us, so we
   // have no idea where it really is.
-  if (m_relativeMoves && isLockedToComputerServer()) {
+  if (m_relativeMoves && (isLockedToComputerServer() || isForegroundGameGuarded())) {
     LOG_VERBOSE("relative move on %s by %d,%d", getName(m_active).c_str(), dx, dy);
     m_active->mouseRelativeMove(dx, dy);
     return;

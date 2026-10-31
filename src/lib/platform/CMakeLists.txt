@@ -7,6 +7,10 @@ if(UNIX AND NOT APPLE)
   include(FindPkgConfig)
   find_package(PkgConfig REQUIRED)
 
+  if(BUILD_X11_SUPPORT)
+    pkg_check_modules(FOREGROUND_XCB REQUIRED xcb xcb-randr)
+  endif()
+
   pkg_check_modules(LIBXKBCOMMON REQUIRED xkbcommon)
   message(STATUS "xkbcommon version: ${LIBXKBCOMMON_VERSION}")
 
@@ -33,6 +37,7 @@ endif()
 
 if(WIN32)
   set(PLATFORM_SOURCES
+    ForegroundGameWindows.cpp
     IMSWindowsClipboardFacade.h
     MSWindowsClipboard.cpp
     MSWindowsClipboard.h
@@ -71,6 +76,7 @@ if(WIN32)
   )
 elseif(APPLE)
   set(PLATFORM_SOURCES
+    ForegroundGameMac.mm
     IOSXKeyResource.cpp
     IOSXKeyResource.h
     OSXAutoTypes.h
@@ -114,6 +120,7 @@ elseif(APPLE)
   )
 elseif(UNIX)
   set(PLATFORM_SOURCES
+    ForegroundGameUnix.cpp
     XDGPortalRegistry.h
     XDGPowerManager.cpp
     XDGPowerManager.h
@@ -187,7 +194,12 @@ elseif(UNIX)
 endif()
 
 # wayland.h is included to check for wayland support
-add_library(platform STATIC ${PLATFORM_SOURCES})
+add_library(platform STATIC ${PLATFORM_SOURCES} ForegroundGame.cpp ForegroundGame.h)
+
+if(UNIX AND NOT APPLE AND BUILD_X11_SUPPORT)
+  target_include_directories(platform PRIVATE ${FOREGROUND_XCB_INCLUDE_DIRS})
+  target_link_libraries(platform PRIVATE ${FOREGROUND_XCB_LINK_LIBRARIES})
+endif()
 
 target_link_libraries(platform PUBLIC client ${libs})
 

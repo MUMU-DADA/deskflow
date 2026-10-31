@@ -127,6 +127,8 @@ void SettingsDialog::initConnections() const
   connect(ui->comboLanguage, &QComboBox::currentIndexChanged, this, &SettingsDialog::setButtonBoxEnabledButtons);
   connect(ui->rbAutoHide, &QRadioButton::toggled, this, &SettingsDialog::setButtonBoxEnabledButtons);
   connect(ui->cbPreventSleep, &QCheckBox::toggled, this, &SettingsDialog::setButtonBoxEnabledButtons);
+  connect(ui->cbFullscreenGameGuard, &QCheckBox::toggled, this, &SettingsDialog::setButtonBoxEnabledButtons);
+  connect(ui->textGameApps, &QPlainTextEdit::textChanged, this, &SettingsDialog::setButtonBoxEnabledButtons);
   connect(ui->rbCloseToTray, &QRadioButton::toggled, this, &SettingsDialog::setButtonBoxEnabledButtons);
   connect(ui->cbElevateDaemon, &QCheckBox::toggled, this, &SettingsDialog::setButtonBoxEnabledButtons);
   connect(ui->cbAutoUpdate, &QCheckBox::toggled, this, &SettingsDialog::setButtonBoxEnabledButtons);
@@ -220,6 +222,8 @@ void SettingsDialog::updateText()
 
 void SettingsDialog::accept()
 {
+  Settings::setValue(Settings::Core::EnableFullscreenGameGuard, ui->cbFullscreenGameGuard->isChecked());
+  Settings::setValue(Settings::Core::FullscreenGameApps, gameApplications());
   Settings::setValue(Settings::Core::Port, ui->sbPort->value());
   Settings::setValue(Settings::Core::Interface, ui->comboInterface->currentData());
   Settings::setValue(Settings::Log::Level, ui->comboLogLevel->currentData());
@@ -255,6 +259,8 @@ void SettingsDialog::accept()
 
 void SettingsDialog::loadFromConfig()
 {
+  ui->cbFullscreenGameGuard->setChecked(Settings::value(Settings::Core::EnableFullscreenGameGuard).toBool());
+  ui->textGameApps->setPlainText(Settings::value(Settings::Core::FullscreenGameApps).toStringList().join('\n'));
   ui->sbPort->setValue(Settings::value(Settings::Core::Port).toInt());
   ui->comboLogLevel->setCurrentIndex(
       ui->comboLogLevel->findData(Settings::logLevelText(), Qt::UserRole, Qt::MatchFixedString)
@@ -382,6 +388,8 @@ void SettingsDialog::updateControls()
   ui->btnClearAllSettings->setEnabled(writable);
   ui->cbAutoUpdate->setEnabled(writable);
   ui->cbPreventSleep->setEnabled(writable);
+  ui->cbFullscreenGameGuard->setEnabled(writable);
+  ui->textGameApps->setEnabled(writable);
   ui->lineTlsCertPath->setEnabled(writable);
   ui->comboTlsKeyLength->setEnabled(writable);
   ui->rbCloseToTray->setEnabled(writable);
@@ -419,6 +427,9 @@ void SettingsDialog::logLevelChanged()
 
 bool SettingsDialog::isModified() const
 {
+  if (ui->cbFullscreenGameGuard->isChecked() != Settings::value(Settings::Core::EnableFullscreenGameGuard).toBool() ||
+      gameApplications() != Settings::value(Settings::Core::FullscreenGameApps).toStringList())
+    return true;
   const auto processMode = Settings::value(Settings::Core::ProcessMode).value<Settings::ProcessMode>();
   const bool ignoreInterface = !m_interfaceSetOnLoad && (ui->comboInterface->currentIndex() == 0);
 
@@ -453,6 +464,8 @@ bool SettingsDialog::isModified() const
 
 bool SettingsDialog::isDefault() const
 {
+  if (!ui->cbFullscreenGameGuard->isChecked() || !gameApplications().isEmpty())
+    return false;
   const auto processMode = Settings::defaultValue(Settings::Core::ProcessMode).value<Settings::ProcessMode>();
   const auto logLevelIndex =
       static_cast<int>(LogLevel::fromOption(Settings::defaultValue(Settings::Log::Level).toString()));
@@ -486,6 +499,8 @@ bool SettingsDialog::isDefault() const
 
 void SettingsDialog::resetToDefault()
 {
+  ui->cbFullscreenGameGuard->setChecked(Settings::defaultValue(Settings::Core::EnableFullscreenGameGuard).toBool());
+  ui->textGameApps->clear();
   ui->sbPort->setValue(Settings::defaultValue(Settings::Core::Port).toInt());
   ui->comboLogLevel->setCurrentIndex(
       static_cast<int>(LogLevel::fromOption(Settings::defaultValue(Settings::Log::Level).toString()))
@@ -536,6 +551,17 @@ void SettingsDialog::setButtonBoxEnabledButtons() const
   m_buttonBox->enableSave(modified);
   m_buttonBox->enableReset(modified);
   m_buttonBox->enableRestoreDefaults(!isDefault());
+}
+
+QStringList SettingsDialog::gameApplications() const
+{
+  QStringList applications;
+  for (const auto &line : ui->textGameApps->toPlainText().split('\n')) {
+    const auto application = line.trimmed();
+    if (!application.isEmpty() && !applications.contains(application))
+      applications.append(application);
+  }
+  return applications;
 }
 
 SettingsDialog::~SettingsDialog() = default;

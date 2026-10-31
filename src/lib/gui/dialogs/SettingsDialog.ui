@@ -132,6 +132,27 @@
        </item>
       </layout>
      </widget>
+     <widget class="QWidget" name="tabGameGuard">
+      <attribute name="title"><string>Games</string></attribute>
+      <layout class="QVBoxLayout" name="gameGuardLayout">
+       <item><widget class="QCheckBox" name="cbFullscreenGameGuard">
+        <property name="text"><string>Prevent mouse switching during fullscreen games</string></property>
+       </widget></item>
+       <item><widget class="QLabel" name="lblGameGuardInfo">
+        <property name="wordWrap"><bool>true</bool></property>
+        <property name="text"><string>Protect the computer you are controlling while its foreground game is fullscreen or borderless fullscreen. Switching away from the game releases automatic protection. Computer-switching hotkeys remain available. Install this version on both computers.</string></property>
+       </widget></item>
+       <item><widget class="QLabel" name="lblGameApps">
+        <property name="text"><string>Additional game applications (one per line)</string></property>
+       </widget></item>
+       <item><widget class="QPlainTextEdit" name="textGameApps">
+        <property name="placeholderText"><string>game.exe
+com.example.game
+/path/to/game</string></property>
+        <property name="toolTip"><string>Add games that are not recognized automatically. Use an executable name, full path, or application identifier. Entries match exactly; fullscreen is still required.</string></property>
+       </widget></item>
+      </layout>
+     </widget>
      <widget class="QWidget" name="tabWindow">
       <attribute name="title">
        <string>&amp;Window</string>

@@ -70,6 +70,11 @@ void ServerProxy::resetKeepAliveAlarm()
   }
 }
 
+void ServerProxy::onFullscreenGameGuardChanged(uint32_t sequence, bool guarded)
+{
+  ProtocolUtil::writef(m_stream, kMsgDFullscreenGameGuard, sequence, guarded ? 1 : 0);
+}
+
 void ServerProxy::setKeepAliveRate(double rate)
 {
   m_keepAliveAlarm = rate * kKeepAlivesUntilDeath;

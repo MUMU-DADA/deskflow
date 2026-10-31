@@ -6,6 +6,7 @@
  */
 
 #include "deskflow/Computer.h"
+
 #include "base/IEventQueue.h"
 #include "base/Log.h"
 #include "deskflow/IPlatformComputer.h"
@@ -96,6 +97,7 @@ Computer::~Computer()
 
 void Computer::enable()
 {
+  invalidateForegroundGameGuard();
   assert(!m_enabled);
 
   m_computer->updateKeyMap();
@@ -133,6 +135,7 @@ void Computer::disable()
 
 void Computer::enter(KeyModifierMask toggleMask)
 {
+  invalidateForegroundGameGuard();
   LOG_INFO("entering computer");
 
   if (m_entered) {
@@ -159,6 +162,7 @@ void Computer::enter(KeyModifierMask toggleMask)
 
 bool Computer::leave()
 {
+  invalidateForegroundGameGuard();
   LOG_INFO("leaving computer");
 
   if (!m_entered) {
@@ -363,6 +367,73 @@ bool Computer::isLockedToComputer() const
   }
   // not locked
   return false;
+}
+
+bool Computer::isForegroundGameGuarded() const
+{
+  using namespace std::chrono;
+  const auto now = steady_clock::now();
+  // QSettings is shared, so capture all inputs on the event-loop thread.
+  const bool enabled = Settings::value(Settings::Core::EnableFullscreenGameGuard).toBool();
+  const auto apps = Settings::value(Settings::Core::FullscreenGameApps).toStringList();
+  const auto stateFile = Settings::value(Settings::Core::FullscreenGameStateFile).toString();
+  if (enabled != m_gameGuardEnabled || apps != m_gameGuardApps || stateFile != m_gameGuardStateFile) {
+    invalidateForegroundGameGuard();
+    m_gameGuardEnabled = enabled;
+    m_gameGuardApps = apps;
+    m_gameGuardStateFile = stateFile;
+  }
+  if (!enabled) {
+    return false;
+  }
+
+  if (m_gameGuardQuery.valid() && m_gameGuardQuery.wait_for(seconds(0)) == std::future_status::ready) {
+    ForegroundGameState state;
+    try {
+      state = m_gameGuardQuery.get();
+    } catch (const std::exception &e) {
+      state.detail = QStringLiteral("Fullscreen game detection failed: %1").arg(QString::fromUtf8(e.what()));
+    }
+    if (m_gameGuardQueryGeneration == m_gameGuardGeneration) {
+      m_cachedGameGuard = state.supported && state.fullscreen && state.game;
+      m_gameGuardValid = true;
+      m_gameGuardObserved = now;
+      const auto diagnostic = !state.detail.isEmpty() ? state.detail
+                              : m_cachedGameGuard    ? QStringLiteral("Foreground fullscreen game protected")
+                                                     : QStringLiteral("No foreground fullscreen game");
+      if (diagnostic != m_gameGuardDiagnostic) {
+        m_gameGuardDiagnostic = diagnostic;
+        if (!state.supported || (state.fullscreen && !state.game)) {
+          LOG_WARN("fullscreen game guard: %s (%s)", qPrintable(diagnostic), qPrintable(state.application));
+        } else {
+          LOG_DEBUG("fullscreen game guard: %s (%s)", qPrintable(diagnostic), qPrintable(state.application));
+        }
+      }
+    }
+  }
+
+  if (!m_gameGuardQuery.valid() && now - m_gameGuardQueryStarted >= milliseconds(100)) {
+    // Settings owns a QSettings instance: snapshot it here, never on the worker.
+    m_gameGuardQueryGeneration = m_gameGuardGeneration;
+    m_gameGuardQueryStarted = now;
+    m_gameGuardQuery = std::async(std::launch::async, [apps, stateFile] {
+      return queryForegroundGame(apps, stateFile);
+    });
+  }
+
+  // Briefly inhibit edge crossing on entry until the first current observation.
+  // A broken detector cannot trap the cursor indefinitely; explicit switches
+  // are always available. Subsequent samples preserve the last known result.
+  return m_gameGuardValid ? m_cachedGameGuard && now - m_gameGuardObserved < seconds(1)
+                         : now - m_gameGuardInvalidated < seconds(1);
+}
+
+void Computer::invalidateForegroundGameGuard() const
+{
+  ++m_gameGuardGeneration;
+  m_gameGuardValid = false;
+  m_gameGuardQueryStarted = {};
+  m_gameGuardInvalidated = std::chrono::steady_clock::now();
 }
 
 int32_t Computer::getJumpZoneSize() const

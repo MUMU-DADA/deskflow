@@ -1,6 +1,22 @@
 # SPDX-FileCopyrightText: (C) 2025 - 2026 Deskflow Developers
 # SPDX-License-Identifier: MIT
 
+create_test(
+  NAME ForegroundGameTests
+  DEPENDS platform
+  LIBS base arch
+  SOURCE ForegroundGameTests.cpp
+  WORKING_DIRECTORY "${CMAKE_BINARY_DIR}/src/lib/platform"
+)
+
+create_test(
+  NAME ForegroundGameUnixParserTests
+  DEPENDS platform
+  LIBS base arch
+  SOURCE ForegroundGameUnixParserTests.cpp
+  WORKING_DIRECTORY "${CMAKE_BINARY_DIR}/src/lib/platform"
+)
+
 if (WIN32)
   create_test(
     NAME MSWindowsClipboardTests

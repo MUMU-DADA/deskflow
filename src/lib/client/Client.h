@@ -192,6 +192,7 @@ public:
 
 private:
   void saveRelativeRestorePosition();
+  void reportFullscreenGameGuard();
   void sendClipboard(ClipboardID);
   void sendEvent(deskflow::EventTypes);
   void sendConnectionFailedEvent(const char *msg);
@@ -226,6 +227,11 @@ private:
   deskflow::Computer *m_computer = nullptr;
   deskflow::IStream *m_stream = nullptr;
   EventQueueTimer *m_timer = nullptr;
+  EventQueueTimer *m_gameGuardTimer = nullptr;
+  bool m_gameGuardProtocol = false;
+  bool m_gameGuardReported = false;
+  bool m_lastGameGuard = false;
+  uint32_t m_gameGuardSequence = 0;
   ServerProxy *m_server = nullptr;
   bool m_ready = false;
   bool m_active = false;

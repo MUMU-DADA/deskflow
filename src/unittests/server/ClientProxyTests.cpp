@@ -8,6 +8,8 @@
 
 #include "../deskflow/MockEventQueue.h"
 #include "deskflow/AppUtil.h"
+#include "deskflow/DeskflowException.h"
+#include "deskflow/ProtocolUtil.h"
 #include "io/IStream.h"
 #include "server/ClientProxy1_0.h"
 #include "server/ClientProxy1_1.h"
@@ -16,6 +18,8 @@
 #include "server/ClientProxy1_8.h"
 
 #include <memory>
+#include <algorithm>
+#include <cstring>
 #include <string>
 #include <vector>
 
@@ -62,9 +66,19 @@ public:
   {
   }
 
-  uint32_t read(void *, uint32_t) override
+  void feed(const QByteArray &bytes)
   {
-    return 0;
+    m_input.append(bytes);
+  }
+
+  uint32_t read(void *buffer, uint32_t size) override
+  {
+    const auto count = std::min<uint32_t>(size, static_cast<uint32_t>(m_input.size()));
+    if (buffer && count) {
+      std::memcpy(buffer, m_input.constData(), count);
+    }
+    m_input.remove(0, count);
+    return count;
   }
 
   void flush() override
@@ -96,6 +110,22 @@ public:
 
 private:
   QByteArray m_buffer;
+  QByteArray m_input;
+};
+
+class GameGuardProxy : public ClientProxy1_0
+{
+public:
+  using ClientProxy1_0::ClientProxy1_0;
+
+  bool report(CapturingStream *stream, uint32_t sequence, uint8_t guarded)
+  {
+    CapturingStream packet;
+    ProtocolUtil::writef(&packet, kMsgDFullscreenGameGuard, sequence, guarded);
+    const auto bytes = packet.take();
+    stream->feed(bytes.mid(4));
+    return parseMessage(reinterpret_cast<const uint8_t *>(bytes.constData()));
+  }
 };
 
 std::unique_ptr<ClientProxy> makeProxy(int minor, deskflow::IStream *stream, IEventQueue *events)
@@ -220,6 +250,82 @@ void ClientProxyTests::keyUp()
   ProxyUnderTest test(minor);
   test.proxy->keyUp(kKey, kMask, kButton);
   QCOMPARE(test.stream->take(), expected);
+}
+
+void ClientProxyTests::fullscreenGameGuardRequiresCapability()
+{
+  MockEventQueue events;
+  auto *stream = new CapturingStream;
+  GameGuardProxy proxy("client", stream, &events);
+  proxy.enter(10, 20, 1, 0, false);
+  // A legacy client is not held waiting for a packet it cannot send.
+  QVERIFY(!proxy.isForegroundGameGuarded());
+  QVERIFY_EXCEPTION_THROWN(proxy.report(stream, 1, 1), BadClientException);
+}
+
+void ClientProxyTests::fullscreenGameGuardTracksActiveVisit()
+{
+  MockEventQueue events;
+  auto *stream = new CapturingStream;
+  GameGuardProxy proxy("client", stream, &events);
+  proxy.setOptions({kOptionFullscreenGameGuard, 1});
+  QVERIFY(proxy.report(stream, 0, 0)); // capability acknowledgement while inactive
+  QVERIFY(!proxy.isForegroundGameGuarded());
+
+  proxy.enter(10, 20, 1, 0, false);
+  QVERIFY(proxy.isForegroundGameGuarded()); // wait for a fresh observation
+  QVERIFY(proxy.report(stream, 0, 0));
+  QVERIFY(proxy.isForegroundGameGuarded()); // stale unlock must not release this visit
+  QVERIFY(proxy.report(stream, 1, 1));
+  QVERIFY(proxy.isForegroundGameGuarded());
+  QVERIFY(proxy.report(stream, 1, 0));
+  QVERIFY(!proxy.isForegroundGameGuarded()); // focus/fullscreen exited
+  QVERIFY(proxy.report(stream, 1, 1));
+  QVERIFY(proxy.isForegroundGameGuarded());
+
+  // Explicit switching uses leave() directly and remains available while guarded.
+  QVERIFY(proxy.leave());
+  QVERIFY(!proxy.isForegroundGameGuarded());
+  QVERIFY(proxy.report(stream, 1, 1));
+  QVERIFY(!proxy.isForegroundGameGuarded()); // inactive device cannot hold focus
+
+  proxy.enter(30, 40, 2, 0, false);
+  QVERIFY(proxy.isForegroundGameGuarded());
+  QVERIFY(proxy.report(stream, 1, 0));
+  QVERIFY(proxy.isForegroundGameGuarded());
+  QVERIFY(proxy.report(stream, 2, 0));
+  QVERIFY(!proxy.isForegroundGameGuarded());
+
+  proxy.resetOptions();
+  proxy.setOptions({kOptionFullscreenGameGuard, 1});
+  QVERIFY(proxy.report(stream, 2, 1));
+  QVERIFY(proxy.isForegroundGameGuarded()); // config reload preserves active sequence
+}
+
+void ClientProxyTests::fullscreenGameGuardRejectsInvalidPayload()
+{
+  MockEventQueue events;
+  auto *stream = new CapturingStream;
+  GameGuardProxy proxy("client", stream, &events);
+  proxy.setOptions({kOptionFullscreenGameGuard, 1});
+  QVERIFY_EXCEPTION_THROWN(proxy.report(stream, 1, 2), BadClientException);
+}
+
+void ClientProxyTests::fullscreenGameGuardResetsOnNewConnection()
+{
+  MockEventQueue events;
+  {
+    auto *stream = new CapturingStream;
+    GameGuardProxy proxy("client", stream, &events);
+    proxy.setOptions({kOptionFullscreenGameGuard, 1});
+    proxy.enter(10, 20, 1, 0, false);
+    QVERIFY(proxy.report(stream, 1, 1));
+    QVERIFY(proxy.isForegroundGameGuarded());
+  }
+  auto *stream = new CapturingStream;
+  GameGuardProxy reconnected("client", stream, &events);
+  reconnected.enter(10, 20, 2, 0, false);
+  QVERIFY(!reconnected.isForegroundGameGuarded());
 }
 
 QTEST_MAIN(ClientProxyTests)

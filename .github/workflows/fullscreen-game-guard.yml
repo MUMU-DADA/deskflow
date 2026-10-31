@@ -1,0 +1,66 @@
+# SPDX-FileCopyrightText: (C) 2026 Deskflow Contributors
+# SPDX-License-Identifier: MIT
+name: Fullscreen game guard
+on:
+  push:
+    branches: [feature/fullscreen-game-guard]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: fullscreen-game-guard-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  desktop:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-2022, macos-15]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: ilammy/msvc-dev-cmd@v1
+        if: runner.os == 'Windows'
+      - uses: ./.github/actions/install-dependencies
+        id: deps
+        with:
+          qt-version: 6.9.3
+          vcpkg-triplet: x64-windows-release
+      - name: Configure
+        shell: bash
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_INSTALLER=OFF -DSKIP_BUILD_TESTS=ON ${{ steps.deps.outputs.vcpkg-cmake-config }}
+      - name: Build
+        run: cmake --build build --config Release --parallel 4
+      - name: Tests
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: ctest --test-dir build/src/unittests -C Release --output-on-failure
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-logs-${{ matrix.os }}
+          path: build/src/unittests/Testing/Temporary/
+  linux:
+    runs-on: ubuntu-latest
+    container: fedora:latest
+    timeout-minutes: 25
+    steps:
+      - name: Dependencies
+        run: dnf install -y git cmake ninja-build gcc-c++ openssl-devel libXtst-devel libxkbfile-devel qt6-qtbase-devel qt6-qttools-devel libxkbcommon-x11-devel libei-devel libxkbcommon-devel libxkbregistry-devel libportal-devel libXinerama-devel libXrandr-devel
+      - uses: actions/checkout@v4
+      - name: Configure
+        run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DBUILD_INSTALLER=OFF -DSKIP_BUILD_TESTS=ON
+      - name: Build
+        run: cmake --build build --parallel 4
+      - name: Tests
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: ctest --test-dir build/src/unittests --output-on-failure
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-logs-linux
+          path: build/src/unittests/Testing/Temporary/

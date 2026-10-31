@@ -320,6 +320,12 @@ void Settings::checkIfSettingsWritableChange()
 
 QVariant Settings::defaultValue(const QString &key)
 {
+  if (key == Core::FullscreenGameApps)
+    return QStringList{};
+
+  if (key == Core::FullscreenGameStateFile)
+    return QString{};
+
   if (key.startsWith(QStringLiteral("computer_"))) {
     const auto computerKey = key.mid(key.indexOf('/') + 1);
     return computerDefaults(computerKey);
