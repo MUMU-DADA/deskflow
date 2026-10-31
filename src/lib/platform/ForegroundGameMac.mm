@@ -19,29 +19,6 @@ QString fromNSString(NSString *value)
   return value ? QString::fromUtf8([value UTF8String]) : QString();
 }
 
-pid_t focusedApplicationPid()
-{
-  // Read keyboard focus directly for each observation, independently of
-  // run-loop-delivered NSWorkspace state. Recheck it before accepting the sample.
-  AXUIElementRef system = AXUIElementCreateSystemWide();
-  if (!system)
-    return -1;
-  CFTypeRef focused = nullptr;
-  const auto result = AXUIElementCopyAttributeValue(system, kAXFocusedApplicationAttribute, &focused);
-  CFRelease(system);
-  if (result != kAXErrorSuccess || !focused) {
-    if (focused)
-      CFRelease(focused);
-    return -1;
-  }
-  pid_t pid = -1;
-  if (CFGetTypeID(focused) != AXUIElementGetTypeID() ||
-      AXUIElementGetPid((AXUIElementRef)focused, &pid) != kAXErrorSuccess)
-    pid = -1;
-  CFRelease(focused);
-  return pid;
-}
-
 bool readBoolean(AXUIElementRef element, CFStringRef attribute)
 {
   CFTypeRef value = nullptr;
@@ -127,24 +104,17 @@ ForegroundGameState queryForegroundGame(const QStringList &gameApps, const QStri
 {
   @autoreleasepool {
     ForegroundGameState state;
-    // Check passively: the standalone probe must never request or change TCC grants.
-    if (!AXIsProcessTrusted()) {
-      state.detail = QStringLiteral("Accessibility permission is missing for this application");
-      return state;
-    }
-    const auto pid = focusedApplicationPid();
-    if (pid <= 0) {
-      state.detail = QStringLiteral("Unable to read the currently focused application");
-      return state;
-    }
-    // Only immutable application metadata is read through NSRunningApplication;
-    // focus/visibility is determined by the fresh AX objects, not cached properties.
-    NSRunningApplication *application = [NSRunningApplication runningApplicationWithProcessIdentifier:pid];
+    // NSWorkspace foreground state is delivered through the main Cocoa run loop.
+    // The caller must keep that loop running while this worker samples; the
+    // standalone probe pumps it between samples and while waiting for each query.
+    NSRunningApplication *application = [[NSWorkspace sharedWorkspace] frontmostApplication];
     if (!application) {
-      state.detail = QStringLiteral("Focused application metadata is unavailable");
+      state.detail = QStringLiteral("No foreground application is available in this session");
       return state;
     }
     state.supported = true;
+    if ([application isHidden] || [application isTerminated])
+      return state;
 
     const auto executable = fromNSString([[application executableURL] path]);
     const auto bundlePath = fromNSString([[application bundleURL] path]);
@@ -159,10 +129,17 @@ ForegroundGameState queryForegroundGame(const QStringList &gameApps, const QStri
         (category.startsWith(QStringLiteral("public.app-category.")) && category.endsWith(QStringLiteral("-games")));
     state.game = matchesGameApplication(identifiers, gameApps) || gameCategory ||
                  (category.isEmpty() && isKnownGamePath(executable));
+    const auto pid = [application processIdentifier];
     CGRect bounds{};
     bool nativeFullscreen = false;
     bool decorated = false;
     bool decorationKnown = false;
+    // Check passively: the standalone probe must never request or change TCC grants.
+    if (!AXIsProcessTrusted()) {
+      state.supported = false;
+      state.detail = QStringLiteral("Accessibility permission is missing for this application");
+      return state;
+    }
     if (!focusedWindowBounds(pid, bounds, nativeFullscreen, decorated, decorationKnown)) {
       state.supported = false;
       state.detail = QStringLiteral("Foreground window is not accessible; fullscreen game protection is unavailable");
@@ -180,11 +157,8 @@ ForegroundGameState queryForegroundGame(const QStringList &gameApps, const QStri
     if (state.fullscreen && !state.game)
       state.detail =
           QStringLiteral("Fullscreen application is not recognised as a game; an application rule is required");
-    if (focusedApplicationPid() != pid) {
-      state.supported = false;
+    if ([[[NSWorkspace sharedWorkspace] frontmostApplication] processIdentifier] != pid)
       state.fullscreen = false;
-      state.detail = QStringLiteral("Focus changed during window inspection; sample discarded");
-    }
     return state;
   }
 }
