@@ -7,6 +7,7 @@ import Gio from 'gi://Gio';
 import GLib from 'gi://GLib';
 import Shell from 'gi://Shell';
 import {Extension} from 'resource:///org/gnome/shell/extensions/extension.js';
+import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 
 export default class ForegroundGameGuard extends Extension {
     enable() {
@@ -29,7 +30,8 @@ export default class ForegroundGameGuard extends Extension {
                 game: false,
             };
             const window = global.display.focus_window;
-            if (window && !window.minimized && window.showing_on_its_workspace()) {
+            if (window && !Main.overview.visible && !Main.sessionMode.isLocked &&
+                !window.minimized && window.showing_on_its_workspace()) {
                 const app = Shell.WindowTracker.get_default().get_window_app(window);
                 state.application = (app?.get_id() ?? window.get_wm_class() ?? '').replace(/\.desktop$/, '');
                 const categories = app?.get_app_info()?.get_categories() ?? '';

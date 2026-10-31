@@ -51,11 +51,11 @@ bool focusedWindowBounds(pid_t pid, CGRect &bounds, bool &nativeFullscreen, bool
   CFTypeRef size = nullptr;
   AXUIElementCopyAttributeValue(window, kAXPositionAttribute, &position);
   AXUIElementCopyAttributeValue(window, kAXSizeAttribute, &size);
-  bool valid = position && size && CFGetTypeID(position) == AXValueGetTypeID() &&
-               CFGetTypeID(size) == AXValueGetTypeID();
+  bool valid =
+      position && size && CFGetTypeID(position) == AXValueGetTypeID() && CFGetTypeID(size) == AXValueGetTypeID();
   if (valid) {
-    valid = AXValueGetValue((AXValueRef)position, kAXValueCGPointType, &bounds.origin) &&
-            AXValueGetValue((AXValueRef)size, kAXValueCGSizeType, &bounds.size);
+    valid = AXValueGetValue((AXValueRef)position, static_cast<AXValueType>(kAXValueCGPointType), &bounds.origin) &&
+            AXValueGetValue((AXValueRef)size, static_cast<AXValueType>(kAXValueCGSizeType), &bounds.size);
   }
   if (position)
     CFRelease(position);
@@ -86,9 +86,7 @@ bool coversDisplay(const CGRect &bounds)
   const QRectF window(bounds.origin.x, bounds.origin.y, bounds.size.width, bounds.size.height);
   for (uint32_t i = 0; i < count; ++i) {
     const auto display = CGDisplayBounds(displays[i]);
-    if (coversGameDisplay(
-            window, QRectF(display.origin.x, display.origin.y, display.size.width, display.size.height)
-        ))
+    if (coversGameDisplay(window, QRectF(display.origin.x, display.origin.y, display.size.width, display.size.height)))
       return true;
   }
   return false;
@@ -116,9 +114,9 @@ ForegroundGameState queryForegroundGame(const QStringList &gameApps, const QStri
     NSBundle *bundle = [application bundleURL] ? [NSBundle bundleWithURL:[application bundleURL]] : nil;
     id categoryValue = [bundle objectForInfoDictionaryKey:@"LSApplicationCategoryType"];
     const auto category = [categoryValue isKindOfClass:[NSString class]] ? fromNSString(categoryValue) : QString();
-    const bool gameCategory = category == QStringLiteral("public.app-category.games") ||
-                              (category.startsWith(QStringLiteral("public.app-category.")) &&
-                               category.endsWith(QStringLiteral("-games")));
+    const bool gameCategory =
+        category == QStringLiteral("public.app-category.games") ||
+        (category.startsWith(QStringLiteral("public.app-category.")) && category.endsWith(QStringLiteral("-games")));
     state.game = matchesGameApplication(identifiers, gameApps) || gameCategory ||
                  (category.isEmpty() && isKnownGamePath(executable));
     const auto pid = [application processIdentifier];
@@ -133,14 +131,16 @@ ForegroundGameState queryForegroundGame(const QStringList &gameApps, const QStri
     }
     // Screen-sized CG bounds alone do not establish that a window is borderless:
     // a maximized window can also fill the display with hidden menu bar and Dock.
-    if (coversDisplay(bounds) && !nativeFullscreen && !decorationKnown) {
+    const bool displayCovered = coversDisplay(bounds);
+    if (displayCovered && !nativeFullscreen && !decorationKnown) {
       state.supported = false;
       state.detail = QStringLiteral("Foreground window does not expose fullscreen or decoration state");
       return state;
     }
-    state.fullscreen = coversDisplay(bounds) && (nativeFullscreen || !decorated);
+    state.fullscreen = displayCovered && (nativeFullscreen || !decorated);
     if (state.fullscreen && !state.game)
-      state.detail = QStringLiteral("Fullscreen application is not recognised as a game; an application rule is required");
+      state.detail =
+          QStringLiteral("Fullscreen application is not recognised as a game; an application rule is required");
     if ([[[NSWorkspace sharedWorkspace] frontmostApplication] processIdentifier] != pid)
       state.fullscreen = false;
     return state;

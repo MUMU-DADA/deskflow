@@ -96,7 +96,8 @@ ForegroundGameState queryForegroundGame(const QStringList &gameApps, const QStri
   const QStringList identifiers{state.application, QFileInfo(state.application).fileName()};
   state.game = matchesGameApplication(identifiers, gameApps) || isKnownGamePath(state.application);
   if (!state.game)
-    state.detail = QStringLiteral("Fullscreen application is not recognised as a game; an application rule is required");
+    state.detail =
+        QStringLiteral("Fullscreen application is not recognised as a game; an application rule is required");
 
   // Discard a sample if focus changed while the executable was being inspected.
   if (GetForegroundWindow() != window) {

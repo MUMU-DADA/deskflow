@@ -1291,6 +1291,32 @@ L&apos;abilitazione di questa impostazione disabiliterà l&apos;interfaccia graf
         <source>Remove all settings</source>
         <translation type="unfinished">Rimuovi tutte le impostazioni</translation>
     </message>
+    <message>
+        <source>Games</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Prevent mouse switching during fullscreen games</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Protect the computer you are controlling while its foreground game is fullscreen or borderless fullscreen. Switching away from the game releases automatic protection. Computer-switching hotkeys remain available. Install this version on both computers.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Additional game applications (one per line)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>game.exe
+com.example.game
+/path/to/game</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Add games that are not recognized automatically. Use an executable name, full path, or application identifier. Entries match exactly; fullscreen is still required.</source>
+        <translation type="unfinished"></translation>
+    </message>
 </context>
 <context>
     <name>SettingsDialogButtonBox</name>

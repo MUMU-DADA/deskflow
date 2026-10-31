@@ -74,7 +74,7 @@ public:
   Return the jump zone size, the size of the regions on the edges of
   the computer that cause the cursor to jump to another computer.
   */
-  int32_t getJumpZoneSize() const;
+  virtual int32_t getJumpZoneSize() const;
 
   //! Get cursor center position
   /*!
@@ -82,7 +82,7 @@ public:
   cursor to compute cursor motion deltas and should be far from
   the edges of the computer, typically the center.
   */
-  void getCursorCenter(int32_t &x, int32_t &y) const;
+  virtual void getCursorCenter(int32_t &x, int32_t &y) const;
 
   //! Get toggle key state
   /*!
@@ -94,7 +94,8 @@ public:
   /*!
   Returns true if the user is locked to the computer.
   */
-  bool isLockedToComputer() const;
+  virtual bool isLockedToComputer() const;
+  bool isForegroundGameGuarded() const override;
 
   //@}
 

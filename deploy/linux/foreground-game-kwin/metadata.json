@@ -1,0 +1,12 @@
+{
+  "KPackageStructure": "KWin/Script",
+  "KPlugin": {
+    "Id": "deskflow-foreground-game",
+    "Name": "Deskflow Foreground Game Guard",
+    "Description": "Reports the focused fullscreen window to Deskflow's local session adapter.",
+    "License": "GPL-2.0-only",
+    "Version": "1.0",
+    "EnabledByDefault": false
+  },
+  "X-Plasma-API": "declarativescript"
+}

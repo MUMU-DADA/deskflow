@@ -21,6 +21,7 @@ create_test(
   SOURCE I18NTests.cpp
   WORKING_DIRECTORY "${CMAKE_BINARY_DIR}/src/lib/common"
 )
+target_compile_definitions(I18NTests PRIVATE DESKFLOW_TEST_TRANSLATIONS_DIR="${CMAKE_BINARY_DIR}/translations")
 
 create_test(
   NAME KeySequenceTests

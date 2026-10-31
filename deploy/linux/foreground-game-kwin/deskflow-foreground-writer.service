@@ -1,0 +1,14 @@
+# SPDX-FileCopyrightText: (C) 2026 Deskflow Developers
+# SPDX-License-Identifier: GPL-2.0-only WITH LicenseRef-OpenSSL-Exception
+[Unit]
+Description=Deskflow foreground-game state bridge for KWin
+PartOf=graphical-session.target
+
+[Service]
+Type=dbus
+BusName=org.deskflow.ForegroundGame
+ExecStart=/usr/bin/python3 %h/.local/libexec/deskflow-foreground-writer.py
+Restart=on-failure
+
+[Install]
+WantedBy=graphical-session.target

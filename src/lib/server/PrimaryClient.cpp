@@ -69,6 +69,11 @@ bool PrimaryClient::isLockedToComputer() const
   return m_computer->isLockedToComputer();
 }
 
+bool PrimaryClient::isForegroundGameGuarded() const
+{
+  return m_computer->isForegroundGameGuarded();
+}
+
 void *PrimaryClient::getEventTarget() const
 {
   return m_computer->getEventTarget();

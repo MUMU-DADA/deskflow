@@ -14,9 +14,9 @@
 #include "deskflow/OptionTypes.h"
 #include "platform/ForegroundGame.h"
 
-#include <string>
 #include <chrono>
 #include <future>
+#include <string>
 
 class IClipboard;
 class IPlatformComputer;

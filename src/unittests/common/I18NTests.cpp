@@ -21,7 +21,7 @@ void I18NTests::initTestCase()
   Settings::setStateFile(m_stateFile);
 
   m_myTDir = QStringLiteral("%1/translations").arg(QCoreApplication::applicationDirPath());
-  const auto srcTDir = QStringLiteral("%1/../../../translations").arg(QCoreApplication::applicationDirPath());
+  const auto srcTDir = QString::fromUtf8(DESKFLOW_TEST_TRANSLATIONS_DIR);
 
   QDir dir;
   if (dir.exists(m_myTDir)) {

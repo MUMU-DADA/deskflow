@@ -21,8 +21,10 @@ struct WindowInfo
 
 inline QRect jsonRect(const QJsonObject &object)
 {
-  return {object.value("x").toInt(), object.value("y").toInt(), object.value("width").toInt(),
-          object.value("height").toInt()};
+  return {
+      object.value("x").toInt(), object.value("y").toInt(), object.value("width").toInt(),
+      object.value("height").toInt()
+  };
 }
 
 inline WindowInfo swayWindow(const QJsonObject &node, QRect output = {}, int depth = 0)
@@ -43,8 +45,7 @@ inline WindowInfo swayWindow(const QJsonObject &node, QRect output = {}, int dep
     info.pid = node.value("pid").toInteger();
     const QRect rect = jsonRect(node.value("rect").toObject());
     const bool borderless = node.value("border").toString() == "none";
-    info.fullscreen = node.value("fullscreen_mode").toInt() != 0 ||
-                      (borderless && output.isValid() && rect == output);
+    info.fullscreen = node.value("fullscreen_mode").toInt() != 0 || (borderless && output.isValid() && rect == output);
     return info;
   }
   for (const auto &children : {QStringLiteral("nodes"), QStringLiteral("floating_nodes")}) {

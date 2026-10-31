@@ -16,7 +16,8 @@ does not automatically become a game.
 | Sway/i3 | Read-only GET_TREE IPC, including native Wayland and XWayland windows |
 | Hyprland | Read-only activewindow IPC and the compositor's internal fullscreen state |
 | GNOME Wayland | The optional GNOME Shell adapter below |
-| KDE Wayland and other compositors | A compositor adapter producing the JSON contract below is required |
+| KDE Plasma 6 Wayland | The optional KWin script and session helper below |
+| Other compositors | An adapter producing the JSON contract below is required |
 
 Game identity comes from an installed desktop entry with `Categories=Game`,
 Steam game metadata/paths, or `core/fullscreenGameApps` application rules. Native
@@ -62,6 +63,45 @@ The extension polls every 250 ms. Disabling it removes its state file. Deskflow
 reports unavailable detection if the file disappears, is invalid, or becomes
 stale. It never treats an unavailable detector as proof that a game is active.
 
+## KDE Plasma 6 adapter
+
+The optional `deploy/linux/foreground-game-kwin` package observes KWin's actual
+active window and fullscreen state, including borderless monitor-sized windows.
+A small session-bus helper writes the same JSON contract. The helper accepts
+updates only from the process currently owning `org.kde.KWin`; it does not run
+commands received over D-Bus. Application categories/rules are evaluated by
+Deskflow, not by the helper. The adapter requires runtime validation on Plasma;
+its source and helper unit tests do not establish end-to-end desktop support.
+
+Install the distribution's Python D-Bus and GLib bindings. On Debian/Ubuntu the
+packages are `python3-dbus` and `python3-gi`. Then, from the repository root:
+
+```sh
+kpackagetool6 --type=KWin/Script --install deploy/linux/foreground-game-kwin
+mkdir -p "$HOME/.local/libexec" "$HOME/.config/systemd/user"
+cp deploy/linux/foreground-game-kwin/deskflow-foreground-writer.py "$HOME/.local/libexec/"
+cp deploy/linux/foreground-game-kwin/deskflow-foreground-writer.service "$HOME/.config/systemd/user/"
+systemctl --user daemon-reload
+systemctl --user enable --now deskflow-foreground-writer.service
+```
+
+Enable **Deskflow Foreground Game Guard** in System Settings → Window Management
+→ KWin Scripts. Set Deskflow's `core/fullscreenGameStateFile` to the absolute
+expanded path of `$XDG_RUNTIME_DIR/deskflow-foreground-game.json`. Use application
+rules for games whose desktop entries are missing or do not declare `Game`.
+
+For desktops without systemd, start `python3 deskflow-foreground-writer.py` in
+the same user session instead and add it to the desktop's session autostart.
+The runtime directory must be private and owned by that user. Disabling the
+KWin script stops refreshes; the state then expires after 1500 ms. Stopping the
+helper removes its file. Normal input processing never waits for these adapters.
+
+The helper's tests need only Python's standard library:
+
+```sh
+python3 deploy/linux/foreground-game-kwin/test_writer.py
+```
+
 ## Compositor adapter contract
 
 Set `core/fullscreenGameStateFile` to a regular JSON file written by an adapter
@@ -96,7 +136,7 @@ Deskflow never runs commands from this file or from the setting.
 
 No built-in KDE/GNOME focus query is assumed from the XDG InputCapture portal:
 that portal manages input capture, not arbitrary applications' focus metadata.
-GNOME requires the included extension; KDE needs a KWin-side adapter.
+GNOME requires the included extension; KDE Plasma 6 requires the included KWin script and session helper.
 
 ## Validation
 

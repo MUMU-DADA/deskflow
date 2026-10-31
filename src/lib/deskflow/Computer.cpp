@@ -12,6 +12,7 @@
 #include "deskflow/IPlatformComputer.h"
 
 #include <QProcess>
+#include <thread>
 
 #ifdef Q_OS_WIN
 #include "arch/win32/ArchMiscWindows.h"
@@ -394,13 +395,19 @@ bool Computer::isForegroundGameGuarded() const
     } catch (const std::exception &e) {
       state.detail = QStringLiteral("Fullscreen game detection failed: %1").arg(QString::fromUtf8(e.what()));
     }
+    if (now - m_gameGuardQueryStarted >= seconds(1)) {
+      state = {};
+      state.detail = QStringLiteral("Detection timed out; fullscreen game protection is temporarily unavailable");
+    }
     if (m_gameGuardQueryGeneration == m_gameGuardGeneration) {
       m_cachedGameGuard = state.supported && state.fullscreen && state.game;
       m_gameGuardValid = true;
-      m_gameGuardObserved = now;
+      // Freshness starts when inspection began, not when its result happened
+      // to be consumed. A delayed observation must not relock a different app.
+      m_gameGuardObserved = m_gameGuardQueryStarted;
       const auto diagnostic = !state.detail.isEmpty() ? state.detail
-                              : m_cachedGameGuard    ? QStringLiteral("Foreground fullscreen game protected")
-                                                     : QStringLiteral("No foreground fullscreen game");
+                              : m_cachedGameGuard     ? QStringLiteral("Foreground fullscreen game protected")
+                                                      : QStringLiteral("No foreground fullscreen game");
       if (diagnostic != m_gameGuardDiagnostic) {
         m_gameGuardDiagnostic = diagnostic;
         if (!state.supported || (state.fullscreen && !state.game)) {
@@ -412,27 +419,45 @@ bool Computer::isForegroundGameGuarded() const
     }
   }
 
+  if (m_gameGuardQuery.valid() && now - m_gameGuardQueryStarted >= seconds(1)) {
+    const auto diagnostic =
+        QStringLiteral("Detection timed out; fullscreen game protection is temporarily unavailable");
+    if (m_gameGuardDiagnostic != diagnostic) {
+      m_gameGuardDiagnostic = diagnostic;
+      LOG_WARN("fullscreen game guard: %s", qPrintable(diagnostic));
+    }
+  }
+
   if (!m_gameGuardQuery.valid() && now - m_gameGuardQueryStarted >= milliseconds(100)) {
     // Settings owns a QSettings instance: snapshot it here, never on the worker.
     m_gameGuardQueryGeneration = m_gameGuardGeneration;
     m_gameGuardQueryStarted = now;
-    m_gameGuardQuery = std::async(std::launch::async, [apps, stateFile] {
-      return queryForegroundGame(apps, stateFile);
-    });
+    std::packaged_task<ForegroundGameState()> query([apps, stateFile] { return queryForegroundGame(apps, stateFile); });
+    m_gameGuardQuery = query.get_future();
+    // A stalled OS service must not block destruction of Computer. This worker
+    // owns its snapshots and native handles, and never refers to this object.
+    try {
+      std::thread(std::move(query)).detach();
+    } catch (const std::system_error &e) {
+      m_gameGuardQuery = {};
+      m_gameGuardValid = true;
+      m_cachedGameGuard = false;
+      m_gameGuardObserved = now;
+      LOG_WARN("unable to start fullscreen game detection: %s", e.what());
+    }
   }
 
   // Briefly inhibit edge crossing on entry until the first current observation.
   // A broken detector cannot trap the cursor indefinitely; explicit switches
   // are always available. Subsequent samples preserve the last known result.
   return m_gameGuardValid ? m_cachedGameGuard && now - m_gameGuardObserved < seconds(1)
-                         : now - m_gameGuardInvalidated < seconds(1);
+                          : now - m_gameGuardInvalidated < seconds(1);
 }
 
 void Computer::invalidateForegroundGameGuard() const
 {
   ++m_gameGuardGeneration;
   m_gameGuardValid = false;
-  m_gameGuardQueryStarted = {};
   m_gameGuardInvalidated = std::chrono::steady_clock::now();
 }
 

@@ -49,7 +49,7 @@ jobs:
     timeout-minutes: 25
     steps:
       - name: Dependencies
-        run: dnf install -y git cmake ninja-build gcc-c++ openssl-devel libXtst-devel libxkbfile-devel qt6-qtbase-devel qt6-qttools-devel libxkbcommon-x11-devel libei-devel libxkbcommon-devel libxkbregistry-devel libportal-devel libXinerama-devel libXrandr-devel
+        run: dnf install -y git cmake ninja-build gcc-c++ openssl-devel libXtst-devel libxkbfile-devel qt6-qtbase-devel qt6-qttools-devel libxkbcommon-x11-devel libei-devel libxkbcommon-devel libportal-devel libXinerama-devel libXrandr-devel libxcb-devel
       - uses: actions/checkout@v4
       - name: Configure
         run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DBUILD_INSTALLER=OFF -DSKIP_BUILD_TESTS=ON

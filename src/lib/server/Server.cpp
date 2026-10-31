@@ -376,7 +376,7 @@ bool Server::isForegroundGameGuarded() const
 void Server::refreshFullscreenGameGuard()
 {
   // Only the computer receiving keyboard/mouse input can request this lock.
-  const bool guarded = m_active == m_primaryClient && m_computer->isForegroundGameGuarded();
+  const bool guarded = m_active == m_primaryClient && m_primaryClient->isForegroundGameGuarded();
   if (guarded != m_primaryGameGuarded) {
     m_primaryGameGuarded = guarded;
     // Disable the low-level jump zones too, so Windows does not eat game

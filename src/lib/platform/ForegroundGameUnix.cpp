@@ -6,7 +6,6 @@
 #include "platform/ForegroundGame.h"
 #include "platform/ForegroundGameUnixParser.h"
 
-
 #include <QDateTime>
 #include <QDirIterator>
 #include <QElapsedTimer>
@@ -18,16 +17,19 @@
 #include <QStandardPaths>
 
 #include <algorithm>
-#include <vector>
-#include <cstring>
 #include <cstdlib>
+#include <cstring>
 #include <memory>
+#include <mutex>
+#include <vector>
 
 // XCB owns each query's connection and returns errors as values. Unlike Xlib,
 // it does not install a process-global error handler that races input handling.
 #if defined(WINAPI_XWINDOWS)
-#include <xcb/xcb.h>
+#include <poll.h>
 #include <xcb/randr.h>
+#include <xcb/xcb.h>
+#include <xcb/xcbext.h>
 #endif
 namespace deskflow {
 namespace {
@@ -43,8 +45,10 @@ ForegroundGameState unavailable(const QString &detail)
 
 // Desktop files are inspected as data, never executed. Cache the catalogue so
 // input polling does not walk the filesystem on every sample.
-const QSet<QString> &desktopGames()
+QSet<QString> desktopGames()
 {
+  static std::mutex mutex;
+  const std::lock_guard lock(mutex);
   static QSet<QString> games;
   static QElapsedTimer age;
   if (age.isValid() && age.elapsed() < 60000)
@@ -100,9 +104,7 @@ ForegroundGameState classify(WindowInfo info, const QStringList &gameApps, bool 
     }
   }
   state.application = info.identifiers.value(0);
-  state.game = nativeGame || matchesGameApplication(
-                                info.identifiers, gameApps
-                            );
+  state.game = nativeGame || matchesGameApplication(info.identifiers, gameApps);
   if (!state.game && state.fullscreen) {
     const auto &games = desktopGames();
     for (const auto &identifier : info.identifiers) {
@@ -137,7 +139,8 @@ QByteArray socketQuery(const QString &path, const QByteArray &request, bool sway
   socket.connectToServer(path, QIODevice::ReadWrite);
   if (!socket.waitForConnected(remaining()))
     return {};
-  if (socket.write(request) != request.size() || !socket.waitForBytesWritten(remaining()))
+  if (socket.write(request) != request.size() ||
+      (socket.bytesToWrite() > 0 && !socket.waitForBytesWritten(remaining())))
     return {};
   QByteArray data;
   while (remaining() > 0) {
@@ -217,42 +220,58 @@ ForegroundGameState queryStateFile(const QString &path, const QStringList &gameA
 }
 
 #if defined(WINAPI_XWINDOWS)
-template <typename T> auto reply(T *value)
+template <typename T> auto reply(xcb_connection_t *connection, unsigned int sequence, const QElapsedTimer &deadline)
 {
-  return std::unique_ptr<T, decltype(&std::free)>(value, &std::free);
+  void *value = nullptr;
+  xcb_generic_error_t *error = nullptr;
+  xcb_flush(connection);
+  while (deadline.elapsed() < 30 && !xcb_connection_has_error(connection)) {
+    if (xcb_poll_for_reply(connection, sequence, &value, &error)) {
+      std::free(error);
+      return std::unique_ptr<T, decltype(&std::free)>(static_cast<T *>(value), &std::free);
+    }
+    pollfd socket{xcb_get_file_descriptor(connection), POLLIN, 0};
+    const int remaining = std::max(1, 30 - static_cast<int>(deadline.elapsed()));
+    if (poll(&socket, 1, remaining) <= 0 || (socket.revents & (POLLERR | POLLHUP | POLLNVAL)))
+      break;
+  }
+  xcb_discard_reply(connection, sequence);
+  return std::unique_ptr<T, decltype(&std::free)>(nullptr, &std::free);
 }
 
-xcb_atom_t atom(xcb_connection_t *connection, const char *name)
+xcb_atom_t atom(xcb_connection_t *connection, const char *name, const QElapsedTimer &deadline)
 {
-  const auto value = reply(xcb_intern_atom_reply(
-      connection, xcb_intern_atom(connection, true, static_cast<uint16_t>(std::strlen(name)), name), nullptr
-  ));
-  return value ? value->atom : XCB_ATOM_NONE;
+  const auto value = reply<xcb_intern_atom_reply_t>(
+      connection, xcb_intern_atom(connection, true, static_cast<uint16_t>(std::strlen(name)), name).sequence, deadline
+  );
+  return value ? value->atom : static_cast<xcb_atom_t>(XCB_ATOM_NONE);
 }
 
-std::vector<uint32_t> propertyNumbers(xcb_connection_t *connection, xcb_window_t window, const char *name,
-                                     xcb_atom_t type)
+std::vector<uint32_t> propertyNumbers(
+    xcb_connection_t *connection, xcb_window_t window, const char *name, xcb_atom_t type, const QElapsedTimer &deadline
+)
 {
-  const auto property = atom(connection, name);
+  const auto property = atom(connection, name, deadline);
   if (property == XCB_ATOM_NONE)
     return {};
-  const auto value = reply(xcb_get_property_reply(
-      connection, xcb_get_property(connection, false, window, property, type, 0, 1024), nullptr
-  ));
+  const auto value = reply<xcb_get_property_reply_t>(
+      connection, xcb_get_property(connection, false, window, property, type, 0, 1024).sequence, deadline
+  );
   if (!value || value->type != type || value->format != 32)
     return {};
   const auto *data = static_cast<const uint32_t *>(xcb_get_property_value(value.get()));
   return {data, data + value->value_len};
 }
 
-QString propertyText(xcb_connection_t *connection, xcb_window_t window, const char *name)
+QString propertyText(xcb_connection_t *connection, xcb_window_t window, const char *name, const QElapsedTimer &deadline)
 {
-  const auto property = atom(connection, name);
+  const auto property = atom(connection, name, deadline);
   if (property == XCB_ATOM_NONE)
     return {};
-  const auto value = reply(xcb_get_property_reply(
-      connection, xcb_get_property(connection, false, window, property, XCB_GET_PROPERTY_TYPE_ANY, 0, 1024), nullptr
-  ));
+  const auto value = reply<xcb_get_property_reply_t>(
+      connection, xcb_get_property(connection, false, window, property, XCB_GET_PROPERTY_TYPE_ANY, 0, 1024).sequence,
+      deadline
+  );
   if (!value || value->format != 8)
     return {};
   return QString::fromUtf8(static_cast<const char *>(xcb_get_property_value(value.get())), value->value_len);
@@ -260,6 +279,8 @@ QString propertyText(xcb_connection_t *connection, xcb_window_t window, const ch
 
 ForegroundGameState queryX11(const QStringList &gameApps)
 {
+  QElapsedTimer deadline;
+  deadline.start();
   int screenIndex = 0;
   std::unique_ptr<xcb_connection_t, decltype(&xcb_disconnect)> connection(
       xcb_connect(nullptr, &screenIndex), &xcb_disconnect
@@ -273,39 +294,40 @@ ForegroundGameState queryX11(const QStringList &gameApps)
   if (!screens.rem)
     return unavailable(QStringLiteral("Cannot find the X11 screen"));
   const auto *screen = screens.data;
-  const auto active = propertyNumbers(display, screen->root, "_NET_ACTIVE_WINDOW", XCB_ATOM_WINDOW);
+  const auto active = propertyNumbers(display, screen->root, "_NET_ACTIVE_WINDOW", XCB_ATOM_WINDOW, deadline);
   if (active.empty())
     return unavailable(QStringLiteral("The X11 window manager does not expose _NET_ACTIVE_WINDOW"));
   const auto window = active.front();
   if (window == XCB_WINDOW_NONE)
     return classify({}, gameApps);
-  const auto attributes = reply(xcb_get_window_attributes_reply(display, xcb_get_window_attributes(display, window),
-                                                               nullptr));
+  const auto attributes =
+      reply<xcb_get_window_attributes_reply_t>(display, xcb_get_window_attributes(display, window).sequence, deadline);
   if (!attributes || attributes->map_state != XCB_MAP_STATE_VIEWABLE)
     return unavailable(QStringLiteral("The focused X11 window changed during detection"));
   WindowInfo info;
-  const auto states = propertyNumbers(display, window, "_NET_WM_STATE", XCB_ATOM_ATOM);
-  const auto fullscreen = atom(display, "_NET_WM_STATE_FULLSCREEN");
+  const auto states = propertyNumbers(display, window, "_NET_WM_STATE", XCB_ATOM_ATOM, deadline);
+  const auto fullscreen = atom(display, "_NET_WM_STATE_FULLSCREEN", deadline);
   info.fullscreen = fullscreen != XCB_ATOM_NONE && std::find(states.begin(), states.end(), fullscreen) != states.end();
   if (!info.fullscreen) {
-    const auto frame = propertyNumbers(display, window, "_NET_FRAME_EXTENTS", XCB_ATOM_CARDINAL);
+    const auto frame = propertyNumbers(display, window, "_NET_FRAME_EXTENTS", XCB_ATOM_CARDINAL, deadline);
     const bool borderless = frame.size() == 4 && std::all_of(frame.begin(), frame.end(), [](auto v) { return v == 0; });
     if (borderless) {
-      const auto geometry = reply(xcb_get_geometry_reply(display, xcb_get_geometry(display, window), nullptr));
-      const auto position = reply(xcb_translate_coordinates_reply(
-          display, xcb_translate_coordinates(display, window, screen->root, 0, 0), nullptr
-      ));
+      const auto geometry =
+          reply<xcb_get_geometry_reply_t>(display, xcb_get_geometry(display, window).sequence, deadline);
+      const auto position = reply<xcb_translate_coordinates_reply_t>(
+          display, xcb_translate_coordinates(display, window, screen->root, 0, 0).sequence, deadline
+      );
       if (geometry && position) {
         const QRect rect(position->dst_x, position->dst_y, geometry->width, geometry->height);
-        const auto resources = reply(xcb_randr_get_screen_resources_current_reply(
-            display, xcb_randr_get_screen_resources_current(display, screen->root), nullptr
-        ));
+        const auto resources = reply<xcb_randr_get_screen_resources_current_reply_t>(
+            display, xcb_randr_get_screen_resources_current(display, screen->root).sequence, deadline
+        );
         if (resources) {
           const auto *crtcs = xcb_randr_get_screen_resources_current_crtcs(resources.get());
           for (int i = 0; i < resources->num_crtcs && !info.fullscreen; ++i) {
-            const auto crtc = reply(xcb_randr_get_crtc_info_reply(
-                display, xcb_randr_get_crtc_info(display, crtcs[i], resources->config_timestamp), nullptr
-            ));
+            const auto crtc = reply<xcb_randr_get_crtc_info_reply_t>(
+                display, xcb_randr_get_crtc_info(display, crtcs[i], resources->config_timestamp).sequence, deadline
+            );
             if (crtc)
               info.fullscreen = crtc->mode != XCB_NONE && rect == QRect(crtc->x, crtc->y, crtc->width, crtc->height);
           }
@@ -316,23 +338,23 @@ ForegroundGameState queryX11(const QStringList &gameApps)
     }
   }
   // WM_CLASS is two NUL-delimited strings: instance, then class.
-  const auto windowClass = propertyText(display, window, "WM_CLASS");
+  const auto windowClass = propertyText(display, window, "WM_CLASS", deadline);
   const auto classes = windowClass.split(QChar('\0'), Qt::SkipEmptyParts);
   for (auto i = classes.crbegin(); i != classes.crend(); ++i)
     info.identifiers.append(*i);
   for (const auto *property : {"_GTK_APPLICATION_ID", "_KDE_NET_WM_DESKTOP_FILE"}) {
-    auto id = propertyText(display, window, property);
+    auto id = propertyText(display, window, property, deadline);
     if (id.endsWith(".desktop"))
       id.chop(8);
     if (!id.isEmpty())
       info.identifiers.append(id);
   }
-  const auto pid = propertyNumbers(display, window, "_NET_WM_PID", XCB_ATOM_CARDINAL);
+  const auto pid = propertyNumbers(display, window, "_NET_WM_PID", XCB_ATOM_CARDINAL, deadline);
   if (!pid.empty())
     info.pid = static_cast<qint64>(pid.front());
-  const auto steam = propertyNumbers(display, window, "_STEAM_GAME", XCB_ATOM_CARDINAL);
+  const auto steam = propertyNumbers(display, window, "_STEAM_GAME", XCB_ATOM_CARDINAL, deadline);
   // Do not publish a game from a window that lost focus during the queries.
-  if (propertyNumbers(display, screen->root, "_NET_ACTIVE_WINDOW", XCB_ATOM_WINDOW) != active)
+  if (propertyNumbers(display, screen->root, "_NET_ACTIVE_WINDOW", XCB_ATOM_WINDOW, deadline) != active)
     return unavailable(QStringLiteral("The focused X11 window changed during detection"));
   return classify(info, gameApps, !steam.empty() && steam.front() > 0);
 }
@@ -346,8 +368,8 @@ ForegroundGameState sample(const QStringList &gameApps, const QString &stateFile
     return querySway(swaySocket, gameApps);
   if (!qEnvironmentVariableIsEmpty("HYPRLAND_INSTANCE_SIGNATURE"))
     return queryHyprland(gameApps);
-  const bool wayland = qEnvironmentVariable("XDG_SESSION_TYPE") == "wayland" ||
-                       !qEnvironmentVariableIsEmpty("WAYLAND_DISPLAY");
+  const bool wayland =
+      qEnvironmentVariable("XDG_SESSION_TYPE") == "wayland" || !qEnvironmentVariableIsEmpty("WAYLAND_DISPLAY");
   // XWayland sees only X11 windows and may retain stale focus while a native
   // Wayland app is active. Never use it as a global Wayland focus detector.
   if (wayland)

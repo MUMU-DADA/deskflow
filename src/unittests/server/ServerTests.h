@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: GPL-2.0-only WITH LicenseRef-OpenSSL-Exception
  */
 
+#include "base/Log.h"
 #include <QTest>
 
 class ServerTests : public QObject
@@ -12,4 +13,10 @@ class ServerTests : public QObject
 private Q_SLOTS:
   void SwitchToComputerInfo_alloc_computer();
   void KeyboardBroadcastInfo_alloc_stateAndComputers();
+  void fullscreenGameGuard_activeDeviceOnlyAndExplicitSwitch();
+  void fullscreenGameGuard_cancelsDelayedSwitch();
+  void fullscreenGameGuard_preservesManualLock();
+
+private:
+  Log m_log;
 };

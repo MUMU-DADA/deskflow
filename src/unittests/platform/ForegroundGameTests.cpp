@@ -44,8 +44,8 @@ void ForegroundGameTests::geometry_data()
   QTest::addColumn<bool>("fullscreen");
   const QRectF display(0, 0, 1920, 1080);
   QTest::newRow("full-display") << display << display << true;
-  QTest::newRow("secondary-monitor-negative-origin") << QRectF(-2560, -100, 2560, 1440)
-                                                    << QRectF(-2560, -100, 2560, 1440) << true;
+  QTest::newRow("secondary-monitor-negative-origin")
+      << QRectF(-2560, -100, 2560, 1440) << QRectF(-2560, -100, 2560, 1440) << true;
   QTest::newRow("maximized-work-area") << QRectF(0, 0, 1920, 1040) << display << false;
   QTest::newRow("title-bar") << QRectF(0, 30, 1920, 1050) << display << false;
   QTest::newRow("same-size-on-another-monitor") << QRectF(1920, 0, 1920, 1080) << display << false;

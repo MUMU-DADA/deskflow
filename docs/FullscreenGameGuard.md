@@ -48,7 +48,8 @@ are excluded. Use the feature switch if an application is misidentified.
   does not expose sufficient window information cannot be classified reliably.
 * Linux/BSD X11: EWMH active window/fullscreen state and XCB monitor geometry.
 * Linux Wayland: compositor-specific adapters are required. Sway and Hyprland
-  expose suitable IPC; other desktops require an integration that supplies the
+  expose suitable IPC; GNOME and KDE Plasma 6 have optional desktop adapters
+  supplied in this fork. Other desktops require an integration that supplies the
   documented state file. See [Linux integration](FULLSCREEN_GAME_LINUX.md).
 
 An unavailable detector does not mean the game is protected. Diagnostic messages
