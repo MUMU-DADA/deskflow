@@ -14,6 +14,13 @@ add_executable(${target}
 
 if(APPLE)
   target_sources(${target} PRIVATE MacCoreApplication.h MacCoreApplication.mm)
+  set(core_info_plist "${CMAKE_CURRENT_BINARY_DIR}/MacCoreInfo.plist")
+  configure_file(MacCoreInfo.plist.in "${core_info_plist}" @ONLY)
+  # Single-file helpers need their own background declaration even when placed
+  # inside the GUI bundle. Preserve the current executable and resource paths.
+  target_link_options(${target} PRIVATE "LINKER:-sectcreate,__TEXT,__info_plist,${core_info_plist}")
+  set_property(TARGET ${target} APPEND PROPERTY LINK_DEPENDS "${core_info_plist}")
+  set_property(TARGET ${target} PROPERTY DESKFLOW_CORE_INFO_PLIST "${core_info_plist}")
 endif()
 
 if(WIN32)

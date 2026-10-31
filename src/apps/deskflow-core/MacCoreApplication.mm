@@ -5,86 +5,78 @@
 
 #include "MacCoreApplication.h"
 
-#include <QByteArray>
+#include "common/Constants.h"
+
 #include <QDebug>
+#include <QString>
 
 #import <AppKit/AppKit.h>
 
 namespace deskflow {
 
 namespace {
-constexpr auto foregroundTransformVariable = "QT_MAC_DISABLE_FOREGROUND_APPLICATION_TRANSFORM";
+QString bundleString(CFBundleRef bundle, CFStringRef key)
+{
+  const auto value = CFBundleGetValueForInfoDictionaryKey(bundle, key);
+  return value && CFGetTypeID(value) == CFStringGetTypeID() ? QString::fromCFString(static_cast<CFStringRef>(value))
+                                                            : QString();
 }
 
-MacCoreApplicationBootstrap::MacCoreApplicationBootstrap()
-    : m_previousValue(qgetenv(foregroundTransformVariable)),
-      m_previousWasSet(qEnvironmentVariableIsSet(foregroundTransformVariable))
+QString bundleString(NSBundle *bundle, NSString *key)
 {
+  id value = [bundle objectForInfoDictionaryKey:key];
+  return [value isKindOfClass:[NSString class]] ? QString::fromNSString(value) : QString();
 }
+} // namespace
 
-MacCoreApplicationBootstrap::~MacCoreApplicationBootstrap()
+bool MacCoreApplicationBootstrap::prepare() const
 {
-  restoreEnvironment();
-}
+  @autoreleasepool {
+    if (![NSThread isMainThread] || NSApp) {
+      qCritical("The macOS core's metadata must be checked on the main thread before QApplication");
+      return false;
+    }
 
-bool MacCoreApplicationBootstrap::prepare()
-{
-  // Qt's Cocoa plugin otherwise promotes this executable to Regular while
-  // constructing QApplication, before any later attempt to hide the core.
-  // This is a private Qt implementation switch, verified against Qt 6.9.3's
-  // qcocoaintegration.mm. MacCoreApplicationTests checks the native policy
-  // before our explicit policy change so a Qt upgrade cannot silently break it.
-  if (![NSThread isMainThread] || !qputenv(foregroundTransformVariable, "1")) {
-    qCritical("Unable to prepare the macOS core's background application policy");
-    return false;
-  }
-  m_environmentChanged = true;
-  return true;
-}
+    // A secondary executable's embedded __TEXT,__info_plist replaces the
+    // enclosing GUI bundle's dictionary. Check both public bundle APIs without
+    // creating NSApplication; Qt must create its own QNSApplication subclass.
+    const auto expectedId = QStringLiteral("%1.core").arg(kRevFqdnName);
+    const auto cfBundle = CFBundleGetMainBundle();
+    NSBundle *nsBundle = [NSBundle mainBundle];
+    const auto background =
+        cfBundle ? CFBundleGetValueForInfoDictionaryKey(cfBundle, CFSTR("LSBackgroundOnly")) : nullptr;
+    id nsBackground = [nsBundle objectForInfoDictionaryKey:@"LSBackgroundOnly"];
+    if (!cfBundle || !background || CFGetTypeID(background) != CFBooleanGetTypeID() ||
+        !CFBooleanGetValue(static_cast<CFBooleanRef>(background)) ||
+        bundleString(cfBundle, kCFBundleIdentifierKey) != expectedId ||
+        bundleString(cfBundle, kCFBundleExecutableKey) != kCoreBinName ||
+        ![nsBackground isKindOfClass:[NSNumber class]] || ![nsBackground boolValue] ||
+        bundleString(nsBundle, @"CFBundleIdentifier") != expectedId ||
+        bundleString(nsBundle, @"CFBundleExecutable") != kCoreBinName) {
+      qCritical("The macOS core is missing its embedded background-only application metadata");
+      return false;
+    }
 
-bool MacCoreApplicationBootstrap::restoreEnvironment()
-{
-  if (!m_environmentChanged)
     return true;
-
-  // Enter/exit commands inherit the core's environment. Do not alter the Qt
-  // activation policy of unrelated applications started by those commands.
-  if (!(m_previousWasSet ? qputenv(foregroundTransformVariable, m_previousValue)
-                         : qunsetenv(foregroundTransformVariable))) {
-    qCritical("Unable to restore the macOS core's Qt initialization environment");
-    return false;
   }
-  m_environmentChanged = false;
-  return true;
 }
 
-bool MacCoreApplicationBootstrap::finish()
+bool MacCoreApplicationBootstrap::finish() const
 {
-  const bool environmentRestored = restoreEnvironment();
   @autoreleasepool {
     if (![NSThread isMainThread] || !NSApp) {
-      qCritical("The macOS core's background policy must be initialized on the main thread after QApplication");
+      qCritical("The macOS core's background policy must be checked on the main thread after QApplication");
       return false;
     }
 
-    const auto policy = [NSApp activationPolicy];
-    if (policy == NSApplicationActivationPolicyRegular) {
-      qWarning(
-          "The macOS core became a foreground application during Qt initialization; check the Qt Cocoa integration"
-      );
-    }
-
-    // Prohibited corresponds to LSBackgroundOnly, matching the core's former
-    // background-only Carbon transform. The core has no windows to activate;
-    // QApplication and its event loop are still needed for platform services.
-    if ((policy != NSApplicationActivationPolicyProhibited &&
-         ![NSApp setActivationPolicy:NSApplicationActivationPolicyProhibited]) ||
-        [NSApp activationPolicy] != NSApplicationActivationPolicyProhibited) {
-      qCritical("Unable to establish the macOS core's background-only application policy");
+    // Never hide an initialization error by demoting the process afterward:
+    // a transient Regular registration can already have entered Dock history.
+    if ([NSApp activationPolicy] != NSApplicationActivationPolicyProhibited) {
+      qCritical("The macOS core was not background-only during Qt initialization");
       return false;
     }
   }
-  return environmentRestored;
+  return true;
 }
 
 } // namespace deskflow

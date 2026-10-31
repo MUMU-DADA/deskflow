@@ -5,29 +5,15 @@
 
 #pragma once
 
-#include <QByteArray>
-
 namespace deskflow {
 
-// These methods run on the main thread, immediately around QApplication's
-// construction. Do not create NSApplication before Qt creates QNSApplication.
+// Check the embedded background declaration before Qt creates QNSApplication,
+// then check the native policy immediately afterward, both on the main thread.
 class MacCoreApplicationBootstrap
 {
 public:
-  MacCoreApplicationBootstrap();
-  ~MacCoreApplicationBootstrap();
-  MacCoreApplicationBootstrap(const MacCoreApplicationBootstrap &) = delete;
-  MacCoreApplicationBootstrap &operator=(const MacCoreApplicationBootstrap &) = delete;
-
-  bool prepare();
-  bool finish();
-
-private:
-  bool restoreEnvironment();
-
-  const QByteArray m_previousValue;
-  const bool m_previousWasSet;
-  bool m_environmentChanged = false;
+  bool prepare() const;
+  bool finish() const;
 };
 
 } // namespace deskflow

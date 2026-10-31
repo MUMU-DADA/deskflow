@@ -10,6 +10,7 @@
 #include "common/ExitCodes.h"
 
 #include <QApplication>
+#include <QDir>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QProcess>
@@ -30,6 +31,36 @@ int deskflowCoreMain(int argc, char **argv);
 namespace {
 constexpr auto foregroundTransformVariable = "QT_MAC_DISABLE_FOREGROUND_APPLICATION_TRANSFORM";
 
+QJsonObject metadataState()
+{
+  const auto cfBundle = CFBundleGetMainBundle();
+  const auto cfString = [cfBundle](CFStringRef key) {
+    const auto value = cfBundle ? CFBundleGetValueForInfoDictionaryKey(cfBundle, key) : nullptr;
+    return value && CFGetTypeID(value) == CFStringGetTypeID() ? QString::fromCFString(static_cast<CFStringRef>(value))
+                                                              : QString();
+  };
+  const auto isFalse = [cfBundle](CFStringRef key) {
+    const auto value = cfBundle ? CFBundleGetValueForInfoDictionaryKey(cfBundle, key) : nullptr;
+    return value && CFGetTypeID(value) == CFBooleanGetTypeID() && !CFBooleanGetValue(static_cast<CFBooleanRef>(value));
+  };
+  const auto background =
+      cfBundle ? CFBundleGetValueForInfoDictionaryKey(cfBundle, CFSTR("LSBackgroundOnly")) : nullptr;
+  NSBundle *nsBundle = [NSBundle mainBundle];
+  return {
+      {"cfIdentifier", cfString(kCFBundleIdentifierKey)},
+      {"cfExecutable", cfString(kCFBundleExecutableKey)},
+      {"cfVersion", cfString(kCFBundleVersionKey)},
+      {"localNetworkUsage", cfString(CFSTR("NSLocalNetworkUsageDescription"))},
+      {"automaticTerminationDisabled", isFalse(CFSTR("NSSupportsAutomaticTermination"))},
+      {"suddenTerminationDisabled", isFalse(CFSTR("NSSupportsSuddenTermination"))},
+      {"cfBackground", background && CFGetTypeID(background) == CFBooleanGetTypeID() &&
+                           CFBooleanGetValue(static_cast<CFBooleanRef>(background))},
+      {"nsIdentifier", QString::fromNSString([nsBundle bundleIdentifier])},
+      {"nsExecutable", QString::fromNSString([nsBundle objectForInfoDictionaryKey:@"CFBundleExecutable"])},
+      {"nsBackground", static_cast<bool>([[nsBundle objectForInfoDictionaryKey:@"LSBackgroundOnly"] boolValue])},
+  };
+}
+
 int printState(QJsonObject state)
 {
   state.insert("policy", NSApp ? static_cast<int>([NSApp activationPolicy]) : -1);
@@ -48,7 +79,7 @@ struct ChildResult
   QJsonObject state;
 };
 
-ChildResult runChild(const QStringList &args, const QString &initialValue = {})
+ChildResult runChild(const QStringList &args, const QString &initialValue = {}, bool hostExecutable = false)
 {
   QTemporaryDir isolated;
   auto environment = QProcessEnvironment::systemEnvironment();
@@ -61,7 +92,9 @@ ChildResult runChild(const QStringList &args, const QString &initialValue = {})
 
   QProcess process;
   process.setProcessEnvironment(environment);
-  process.start(QCoreApplication::applicationFilePath(), args);
+  const auto executable = hostExecutable ? QDir(QCoreApplication::applicationDirPath()).filePath("PolicyHost")
+                                         : QCoreApplication::applicationFilePath();
+  process.start(executable, args);
   ChildResult result;
   result.finished = process.waitForFinished(15000);
   if (!result.finished) {
@@ -90,7 +123,22 @@ void MacCoreApplicationTests::qtInitializationStaysBackground()
   const auto child = runChild({"--bootstrap-child"}, initialValue);
   QVERIFY2(child.finished, child.errors.constData());
   QCOMPARE(child.exitCode, 0);
-  QVERIFY(child.state.value("prepared").toBool());
+  QVERIFY2(
+      child.state.value("prepared").toBool(),
+      (child.errors + QJsonDocument(child.state).toJson(QJsonDocument::Compact)).constData()
+  );
+  QVERIFY(!child.state.value("applicationCreatedBeforeQt").toBool());
+  const auto expectedId = QStringLiteral("%1.core").arg(kRevFqdnName);
+  QCOMPARE(child.state.value("cfIdentifier").toString(), expectedId);
+  QCOMPARE(child.state.value("nsIdentifier").toString(), expectedId);
+  QCOMPARE(child.state.value("cfExecutable").toString(), QString(kCoreBinName));
+  QCOMPARE(child.state.value("nsExecutable").toString(), QString(kCoreBinName));
+  QVERIFY(child.state.value("cfBackground").toBool());
+  QVERIFY(child.state.value("nsBackground").toBool());
+  QVERIFY(!child.state.value("cfVersion").toString().isEmpty());
+  QVERIFY(!child.state.value("localNetworkUsage").toString().isEmpty());
+  QVERIFY(child.state.value("automaticTerminationDisabled").toBool());
+  QVERIFY(child.state.value("suddenTerminationDisabled").toBool());
   // Checking only the final policy misses a transient Regular registration.
   QCOMPARE(child.state.value("beforePolicy").toInt(-1), static_cast<int>(NSApplicationActivationPolicyProhibited));
   QVERIFY(child.state.value("finished").toBool());
@@ -101,15 +149,33 @@ void MacCoreApplicationTests::qtInitializationStaysBackground()
   QCOMPARE(child.state.value("environmentValue").toString(), initialValue);
 }
 
-void MacCoreApplicationTests::unsuppressedQtIsDetectedAndDemoted()
+void MacCoreApplicationTests::ordinaryHostKeepsGuiPolicy()
 {
-  const auto child = runChild({"--qt-control-child"});
+  const auto child = runChild({"--qt-control-child"}, {}, true);
   QVERIFY2(child.finished, child.errors.constData());
   QCOMPARE(child.exitCode, 0);
+  QVERIFY(!child.state.value("prepared").toBool());
+  QVERIFY(!child.state.value("applicationCreatedBeforeQt").toBool());
+  QCOMPARE(child.state.value("cfIdentifier").toString(), QString("org.deskflow.tests.core-policy-host"));
+  QCOMPARE(child.state.value("nsIdentifier").toString(), QString("org.deskflow.tests.core-policy-host"));
+  QCOMPARE(child.state.value("cfExecutable").toString(), QString("PolicyHost"));
+  QCOMPARE(child.state.value("nsExecutable").toString(), QString("PolicyHost"));
+  QVERIFY(!child.state.value("cfBackground").toBool());
+  QVERIFY(!child.state.value("nsBackground").toBool());
   QCOMPARE(child.state.value("beforePolicy").toInt(-1), static_cast<int>(NSApplicationActivationPolicyRegular));
-  QVERIFY(child.state.value("finished").toBool());
-  QCOMPARE(child.state.value("policy").toInt(-1), static_cast<int>(NSApplicationActivationPolicyProhibited));
-  QVERIFY(child.errors.contains("became a foreground application"));
+  QVERIFY(!child.state.value("finished").toBool());
+  QCOMPARE(child.state.value("policy").toInt(-1), static_cast<int>(NSApplicationActivationPolicyRegular));
+  QVERIFY(child.errors.contains("not background-only during Qt initialization"));
+}
+
+void MacCoreApplicationTests::actualCoreRejectsGuiMetadata()
+{
+  const auto child = runChild({"--core-entry-child", "--version"}, {}, true);
+  QVERIFY2(child.finished, child.errors.constData());
+  QCOMPARE(child.exitCode, 0);
+  QCOMPARE(child.state.value("coreExit").toInt(-1), s_exitFailed);
+  QCOMPARE(child.state.value("policy").toInt(-2), -1); // Rejected before NSApplication exists.
+  QVERIFY(child.errors.contains("missing its embedded background-only application metadata"));
 }
 
 void MacCoreApplicationTests::actualCoreEarlyExit_data()
@@ -134,7 +200,7 @@ void MacCoreApplicationTests::actualCoreEarlyExit()
   const auto child = runChild(QStringList{"--core-entry-child"} + args);
   QVERIFY2(child.finished, child.errors.constData());
   QCOMPARE(child.exitCode, 0);
-  QVERIFY2(!child.errors.contains("became a foreground application"), child.errors.constData());
+  QVERIFY2(!child.errors.contains("not background-only during Qt initialization"), child.errors.constData());
   QCOMPARE(child.state.value("coreExit").toInt(-1), expectedExit);
   QCOMPARE(child.state.value("policy").toInt(-1), static_cast<int>(NSApplicationActivationPolicyProhibited));
   QVERIFY(!child.state.value("environmentSet").toBool());
@@ -152,7 +218,10 @@ int main(int argc, char **argv)
     if (argc > 1 &&
         (std::strcmp(argv[1], "--bootstrap-child") == 0 || std::strcmp(argv[1], "--qt-control-child") == 0)) {
       deskflow::MacCoreApplicationBootstrap bootstrap;
-      const bool prepared = std::strcmp(argv[1], "--bootstrap-child") == 0 && bootstrap.prepare();
+      const bool prepared = bootstrap.prepare();
+      auto state = metadataState();
+      state.insert("prepared", prepared);
+      state.insert("applicationCreatedBeforeQt", NSApp != nil);
       QApplication application(argc, argv);
       const int beforePolicy = static_cast<int>([NSApp activationPolicy]);
       const bool finished = bootstrap.finish();
@@ -160,13 +229,11 @@ int main(int argc, char **argv)
       bool eventDelivered = false;
       QTimer::singleShot(0, &application, [&eventDelivered] { eventDelivered = true; });
       QCoreApplication::processEvents();
-      return printState({
-          {"prepared", prepared},
-          {"beforePolicy", beforePolicy},
-          {"finished", finished},
-          {"clipboardAvailable", clipboardAvailable},
-          {"eventDelivered", eventDelivered},
-      });
+      state.insert("beforePolicy", beforePolicy);
+      state.insert("finished", finished);
+      state.insert("clipboardAvailable", clipboardAvailable);
+      state.insert("eventDelivered", eventDelivered);
+      return printState(state);
     }
 
     QCoreApplication application(argc, argv);

@@ -39,8 +39,12 @@ if(APPLE)
   file(MAKE_DIRECTORY "${policy_host}/MacOS")
   configure_file(CorePolicyHost.plist.in "${policy_host}/Info.plist" @ONLY)
   set_target_properties(MacCoreApplicationTests PROPERTIES
+    OUTPUT_NAME "${CMAKE_PROJECT_NAME}-core"
     RUNTIME_OUTPUT_DIRECTORY "${policy_host}/MacOS"
   )
+  get_target_property(core_info_plist ${CMAKE_PROJECT_NAME}-core DESKFLOW_CORE_INFO_PLIST)
+  target_link_options(MacCoreApplicationTests PRIVATE "LINKER:-sectcreate,__TEXT,__info_plist,${core_info_plist}")
+  set_property(TARGET MacCoreApplicationTests APPEND PROPERTY LINK_DEPENDS "${core_info_plist}")
   add_custom_command(TARGET MacCoreApplicationTests POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy "$<TARGET_FILE:MacCoreApplicationTests>" "${policy_host}/MacOS/PolicyHost"
     VERBATIM

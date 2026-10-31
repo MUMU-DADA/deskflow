@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+SPDX-FileCopyrightText: (C) 2026 Deskflow Developers
+SPDX-License-Identifier: MIT
+-->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>CFBundleDevelopmentRegion</key><string>en</string>
+  <key>CFBundleExecutable</key><string>@CMAKE_PROJECT_NAME@-core</string>
+  <key>CFBundleIdentifier</key><string>@CMAKE_PROJECT_REV_FQDN@.core</string>
+  <key>CFBundleInfoDictionaryVersion</key><string>6.0</string>
+  <key>CFBundleName</key><string>@CMAKE_PROJECT_PROPER_NAME@ Core</string>
+  <key>CFBundlePackageType</key><string>APPL</string>
+  <key>CFBundleShortVersionString</key><string>@CMAKE_PROJECT_VERSION_MAJOR@.@CMAKE_PROJECT_VERSION_MINOR@.@CMAKE_PROJECT_VERSION_PATCH@</string>
+  <key>CFBundleVersion</key><string>@CMAKE_PROJECT_VERSION@</string>
+  <key>LSBackgroundOnly</key><true/>
+  <key>NSSupportsAutomaticTermination</key><false/>
+  <key>NSSupportsSuddenTermination</key><false/>
+  <!-- Embedded metadata replaces the parent dictionary; retain this usage description. -->
+  <key>NSLocalNetworkUsageDescription</key>
+  <string>This app uses local network permissions for communication between a Deskflow server and clients.</string>
+</dict>
+</plist>

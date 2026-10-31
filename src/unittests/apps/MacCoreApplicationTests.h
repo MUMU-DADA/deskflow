@@ -14,7 +14,8 @@ class MacCoreApplicationTests : public QObject
 private Q_SLOTS:
   void qtInitializationStaysBackground_data();
   void qtInitializationStaysBackground();
-  void unsuppressedQtIsDetectedAndDemoted();
+  void ordinaryHostKeepsGuiPolicy();
+  void actualCoreRejectsGuiMetadata();
   void actualCoreEarlyExit_data();
   void actualCoreEarlyExit();
 };
