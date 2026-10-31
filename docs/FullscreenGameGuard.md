@@ -50,7 +50,9 @@ are excluded. Use the feature switch if an application is misidentified.
 * Linux Wayland: compositor-specific adapters are required. Sway and Hyprland
   expose suitable IPC; GNOME and KDE Plasma 6 have optional desktop adapters
   supplied in this fork. Other desktops require an integration that supplies the
-  documented state file. See [Linux integration](FULLSCREEN_GAME_LINUX.md).
+  documented state file. Hyprland's built-in detector covers compositor-reported
+  fullscreen, but unflagged monitor-sized borderless games require an adapter.
+  See [Linux integration](FULLSCREEN_GAME_LINUX.md).
 
 An unavailable detector does not mean the game is protected. Diagnostic messages
 identify missing window access or unsupported desktop integrations. There is no

@@ -189,7 +189,8 @@ ForegroundGameState queryHyprland(const QStringList &gameApps)
   if (!document.isObject())
     return unavailable(QStringLiteral("Hyprland foreground-state query failed"));
   // fullscreen is the compositor's effective state, not fullscreenClient.
-  // A borderless fullscreen game managed by Hyprland enters this state too.
+  // Geometry alone cannot establish whether the application draws its own
+  // decorations. Unflagged borderless windows need a compositor adapter.
   return classify(foregroundGameUnix::hyprlandWindow(document.object()), gameApps);
 }
 
@@ -277,13 +278,14 @@ QString propertyText(xcb_connection_t *connection, xcb_window_t window, const ch
   return QString::fromUtf8(static_cast<const char *>(xcb_get_property_value(value.get())), value->value_len);
 }
 
-ForegroundGameState queryX11(const QStringList &gameApps)
+ForegroundGameState queryX11(const QStringList &gameApps, const QString &displayName)
 {
   QElapsedTimer deadline;
   deadline.start();
   int screenIndex = 0;
+  const QByteArray displayBytes = displayName.toLocal8Bit();
   std::unique_ptr<xcb_connection_t, decltype(&xcb_disconnect)> connection(
-      xcb_connect(nullptr, &screenIndex), &xcb_disconnect
+      xcb_connect(displayBytes.isEmpty() ? nullptr : displayBytes.constData(), &screenIndex), &xcb_disconnect
   );
   auto *display = connection.get();
   if (!display || xcb_connection_has_error(display))
@@ -359,10 +361,20 @@ ForegroundGameState queryX11(const QStringList &gameApps)
   return classify(info, gameApps, !steam.empty() && steam.front() > 0);
 }
 #endif
-ForegroundGameState sample(const QStringList &gameApps, const QString &stateFile)
+ForegroundGameState sample(const QStringList &gameApps, const QString &stateFile, const QString &displayName)
 {
   if (!stateFile.isEmpty())
     return queryStateFile(stateFile, gameApps);
+  // The X11 backend can explicitly select another display than the ambient
+  // compositor. In that case ambient I3SOCK/SWAYSOCK must not override it. The
+  // core ignores core/display in Wayland sessions, so preserve that behavior.
+  if (!displayName.isEmpty() && qEnvironmentVariable("XDG_SESSION_TYPE") != "wayland") {
+#if defined(WINAPI_XWINDOWS)
+    return queryX11(gameApps, displayName);
+#else
+    return unavailable(QStringLiteral("The configured X11 display cannot be inspected in this build"));
+#endif
+  }
   const QString swaySocket = qEnvironmentVariable("SWAYSOCK");
   if (!swaySocket.isEmpty())
     return querySway(swaySocket, gameApps);
@@ -380,7 +392,7 @@ ForegroundGameState sample(const QStringList &gameApps, const QString &stateFile
   if (!i3Socket.isEmpty())
     return querySway(i3Socket, gameApps);
 #if defined(WINAPI_XWINDOWS)
-  return queryX11(gameApps);
+  return queryX11(gameApps, displayName);
 #else
   return unavailable(QStringLiteral("X11 detection was not built; a foreground-state adapter is required"));
 #endif
@@ -388,10 +400,11 @@ ForegroundGameState sample(const QStringList &gameApps, const QString &stateFile
 
 } // namespace
 
-ForegroundGameState queryForegroundGame(const QStringList &gameApps, const QString &stateFile)
+ForegroundGameState
+queryForegroundGame(const QStringList &gameApps, const QString &stateFile, const QString &displayName)
 {
   // Called by a single background worker; this never runs in a mouse hook.
-  return sample(gameApps, stateFile);
+  return sample(gameApps, stateFile, displayName);
 }
 
 } // namespace deskflow

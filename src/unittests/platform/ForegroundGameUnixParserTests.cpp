@@ -66,6 +66,10 @@ private Q_SLOTS:
   void hyprlandUsesEffectiveState()
   {
     QJsonObject window{{"class", "game"}, {"mapped", true}, {"fullscreen", 0}, {"fullscreenClient", 2}};
+    // Monitor-sized client geometry does not prove that client-side decorations
+    // are absent; do not turn a fullscreen request into an effective state.
+    window["at"] = QJsonArray{0, 0};
+    window["size"] = QJsonArray{1920, 1080};
     QVERIFY(!hyprlandWindow(window).fullscreen);
     window["fullscreen"] = 1; // Maximized is not fullscreen.
     QVERIFY(!hyprlandWindow(window).fullscreen);

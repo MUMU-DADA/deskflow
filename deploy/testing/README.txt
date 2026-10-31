@@ -45,6 +45,11 @@ Full two-computer test (after the probe result is correct)
 -------------------------------------------------------
 Use the matching fork build on BOTH computers to exercise client-reported game
 state. Keep the current stable installation; do not replace it with this package.
+The staged full macOS app is displayed as Deskflow Game Guard Test and has the
+distinct bundle identifier org.deskflow.deskflow.gameguard-test. Its on-disk
+directory remains Deskflow.app and its main executable remains Deskflow; this
+keeps the built-in core lookup working. The detector-only probe has its own
+org.deskflow.game-probe identity. Neither uses the stable app's bundle identifier.
 Quit the stable GUI/core yourself before starting the full test build. The test
 app shares IPC names with stable Deskflow and is not intended to run concurrently.
 The supplied launcher refuses to start if a GUI/core is already running.
@@ -57,7 +62,9 @@ Windows test config: settings/Deskflow.conf and test-state/ inside this folder.
 The package does not register a Windows service or change startup settings.
 Set up the test pair manually; existing connection/settings files are not copied.
 macOS may ask the human user for Accessibility and Local Network permission for
-the test app/core. TLS trust and certificate confirmation also remain explicit.
+Deskflow Game Guard Test and its core. Select the test copy's exact path, leaving
+the installed stable app's permission entries intact. Ad-hoc updates can require
+a new grant. TLS trust and certificate confirmation also remain explicit.
 
 Expected behavior: only the currently controlled computer's foreground fullscreen
 game inhibits mouse edge crossing. Switching away from the game restores normal

@@ -36,7 +36,7 @@ private:
 };
 } // namespace
 
-ForegroundGameState queryForegroundGame(const QStringList &gameApps, const QString &)
+ForegroundGameState queryForegroundGame(const QStringList &gameApps, const QString &, const QString &)
 {
   ForegroundGameState state;
   const PhysicalCoordinates coordinates;

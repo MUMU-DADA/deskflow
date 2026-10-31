@@ -21,7 +21,10 @@ struct ForegroundGameState
 
 // Inspect only this computer's foreground application. The caller decides whether
 // this computer is currently receiving shared input and whether the feature is enabled.
-ForegroundGameState queryForegroundGame(const QStringList &gameApps, const QString &stateFile);
+// An explicit X11 display must match the core's selected display. Standalone
+// callers can omit it to use the current desktop environment without Settings.
+ForegroundGameState
+queryForegroundGame(const QStringList &gameApps, const QString &stateFile, const QString &displayName = {});
 
 // Exact application identifiers, executable names or paths, never window titles.
 bool matchesGameApplication(const QStringList &identifiers, const QStringList &rules);

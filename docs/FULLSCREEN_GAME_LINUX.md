@@ -27,6 +27,24 @@ the user has switched to a native Wayland application.
 
 X11 builds additionally require the `xcb` and `xcb-randr` development packages.
 On Debian/Ubuntu these are `libxcb1-dev` and `libxcb-randr0-dev`.
+Detection uses the same `core/display` selected when the native X11 backend
+starts. Changing this setting requires restarting the core; the standalone
+probe instead uses its process's `DISPLAY` environment.
+
+## Hyprland coverage limit
+
+The built-in Hyprland detector currently requires the compositor's effective
+fullscreen flag. A borderless game that covers its monitor while Hyprland still
+reports `fullscreen: 0` is **not detected** by this backend. Such a case requires
+the state-file adapter below. Merely comparing `activewindow` geometry against
+`monitors` is insufficient: it does not establish the absence of decorations
+drawn inside the application's own surface. The `decorations` query describes
+compositor decorations, not all client-side decorations, and `fullscreenClient`
+can be set while the compositor keeps a window tiled or maximized.
+
+This limitation is deliberately not hidden by treating every monitor-sized
+game window as fullscreen. See Hyprland's [query documentation](https://wiki.hypr.land/configuring/core/advanced-configuration/using-hyprctl/)
+and [IPC serialization](https://github.com/hyprwm/Hyprland/blob/4b9ac40d71ceeeb027cfa06992c9212e3c3077b6/src/ipc/s1/Commands.cpp).
 
 ## GNOME adapter
 

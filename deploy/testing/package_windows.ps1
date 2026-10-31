@@ -33,6 +33,11 @@ foreach ($name in @('deskflow.exe', 'deskflow-core.exe', 'deskflow-game-probe.ex
         --dir $stage --plugindir (Join-Path $stage 'plugins') (Join-Path $stage $name)
     if ($LASTEXITCODE -ne 0) { throw "windeployqt failed for $name" }
 }
+$translations = Join-Path $stage 'translations'
+New-Item -ItemType Directory -Path $translations -Force | Out-Null
+$applicationTranslations = @(Get-ChildItem -LiteralPath (Join-Path $build 'translations') -Filter 'deskflow_*.qm')
+if (!$applicationTranslations.Count) { throw 'Compiled Deskflow translations are missing' }
+$applicationTranslations | Copy-Item -Destination $translations -Force
 # Only app-local redistributable DLLs from the official VS Redist folder;
 # never copy compiler-bin or system32 DLLs. Windows 10 supplies the UCRT.
 if (!$RedistDirectory -or !(Test-Path -LiteralPath $RedistDirectory)) {

@@ -48,7 +48,8 @@ bool runComputerCommand(const QString &commandLine)
 //
 
 Computer::Computer(IPlatformComputer *platformComputer, IEventQueue *events)
-    : m_computer(platformComputer),
+    : m_gameGuardDisplay(Settings::value(Settings::Core::Display).toString()),
+      m_computer(platformComputer),
       m_isPrimary(platformComputer->isPrimary()),
       m_entered(m_isPrimary),
       m_events(events)
@@ -432,7 +433,9 @@ bool Computer::isForegroundGameGuarded() const
     // Settings owns a QSettings instance: snapshot it here, never on the worker.
     m_gameGuardQueryGeneration = m_gameGuardGeneration;
     m_gameGuardQueryStarted = now;
-    std::packaged_task<ForegroundGameState()> query([apps, stateFile] { return queryForegroundGame(apps, stateFile); });
+    std::packaged_task<ForegroundGameState()> query([apps, stateFile, displayName = m_gameGuardDisplay] {
+      return queryForegroundGame(apps, stateFile, displayName);
+    });
     m_gameGuardQuery = query.get_future();
     // A stalled OS service must not block destruction of Computer. This worker
     // owns its snapshots and native handles, and never refers to this object.

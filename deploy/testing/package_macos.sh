@@ -17,6 +17,26 @@ mkdir -p "$stage"
 ditto "$build/bin/Deskflow.app" "$stage/Deskflow.app"
 ditto "$build/bin/deskflow-game-probe.app" "$stage/Deskflow Game Probe.app"
 
+# Change only the staged full-test bundle, before deployment/signing. Its
+# executable and folder names remain compatible with Deskflow's core lookup.
+# The stable installed application retains its own bundle/TCC identity.
+python3 -B - "$stage/Deskflow.app/Contents/Info.plist" <<'PY'
+import pathlib
+import plistlib
+import sys
+
+path = pathlib.Path(sys.argv[1])
+with path.open("rb") as stream:
+    info = plistlib.load(stream)
+if info.get("CFBundleExecutable") != "Deskflow":
+    raise RuntimeError("Unexpected full-test bundle executable")
+info["CFBundleIdentifier"] = "org.deskflow.deskflow.gameguard-test"
+info["CFBundleName"] = "Deskflow Game Guard Test"
+info["CFBundleDisplayName"] = "Deskflow Game Guard Test"
+with path.open("wb") as stream:
+    plistlib.dump(info, stream, sort_keys=False)
+PY
+
 # BUILD_INSTALLER=OFF skips deploy/mac/deploy.cmake entirely. Deploy both apps,
 # including the core executable nested inside the GUI bundle, explicitly here.
 macdeployqt "$stage/Deskflow.app" "-executable=$stage/Deskflow.app/Contents/MacOS/deskflow-core" -always-overwrite -verbose=2

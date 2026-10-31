@@ -314,6 +314,10 @@ private:
   mutable std::chrono::steady_clock::time_point m_gameGuardObserved{};
   mutable std::chrono::steady_clock::time_point m_gameGuardInvalidated = std::chrono::steady_clock::now();
 
+  // Snapshot alongside construction of the native backend; changing the display
+  // setting later must not make the detector inspect a different live session.
+  const QString m_gameGuardDisplay;
+
   // our platform dependent computer
   IPlatformComputer *m_computer = nullptr;
 
