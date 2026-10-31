@@ -36,7 +36,8 @@ for app in "$stage/Deskflow.app" "$stage/Deskflow Game Probe.app"; do
   codesign --force --deep --sign - "$app"
   codesign --verify --deep --strict "$app"
 done
-python3 "$repo/deploy/testing/verify_macos_bundle.py" "$stage/Deskflow.app" "$stage/Deskflow Game Probe.app"
+python3 -B "$repo/deploy/testing/test_verify_macos_bundle.py"
+python3 -B "$repo/deploy/testing/verify_macos_bundle.py" "$stage/Deskflow.app" "$stage/Deskflow Game Probe.app"
 
 # A relocated, minimal-environment smoke check must load only bundled Qt.
 # --help / --version return before input hooks, networking or Settings startup.

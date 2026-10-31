@@ -28,7 +28,7 @@ def verify(bundle):
                             .replace("@executable_path", str(executable_dir)))
 
     def rpaths(binary):
-        listing = output("otool", "-l", str(binary))
+        listing = output("otool", "-arch", "arm64", "-l", str(binary))
         return [expand(value, binary) for value in
                 re.findall(r"cmd LC_RPATH\s+cmdsize \d+\s+path (.+?) \(offset", listing)]
 
@@ -46,8 +46,13 @@ def verify(bundle):
         if "arm64" not in output("lipo", "-archs", str(binary)).split():
             raise RuntimeError(f"Missing arm64 slice: {binary}")
         search = rpaths(binary) + main_rpaths
-        for line in output("otool", "-L", str(binary)).splitlines()[1:]:
-            dependency = line.strip().split(" (compatibility version", 1)[0]
+        # Qt frameworks can contain both arm64 and x86_64. Inspect the deployed
+        # architecture explicitly and never mistake an architecture header for a dependency.
+        for line in output("otool", "-arch", "arm64", "-L", str(binary)).splitlines():
+            match = re.match(r"^\s+(.+?) \(compatibility version", line)
+            if not match:
+                continue
+            dependency = match.group(1)
             if dependency.startswith(("/System/Library/", "/usr/lib/")):
                 continue
             if dependency.startswith("@rpath/"):
