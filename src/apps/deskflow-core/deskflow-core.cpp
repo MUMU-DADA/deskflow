@@ -19,6 +19,8 @@
 
 #if defined(Q_OS_WIN)
 #include "arch/win32/ArchMiscWindows.h"
+#elif defined(Q_OS_MACOS)
+#include "MacCoreApplication.h"
 #endif
 
 #include <QApplication>
@@ -71,10 +73,19 @@ int main(int argc, char **argv)
 {
 #if defined(Q_OS_WIN)
   ArchMiscWindows::setInstanceWin32(GetModuleHandle(nullptr));
+#elif defined(Q_OS_MACOS)
+  deskflow::MacCoreApplicationBootstrap macBootstrap;
+  if (!macBootstrap.prepare())
+    return s_exitFailed;
 #endif
 
   QApplication::setApplicationName(QStringLiteral("%1 Core").arg(kAppName));
   QApplication app(argc, argv);
+
+#if defined(Q_OS_MACOS)
+  if (!macBootstrap.finish())
+    return s_exitFailed;
+#endif
 
   Arch arch;
   arch.init();
