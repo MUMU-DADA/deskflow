@@ -69,10 +69,11 @@ bool focusedWindowBounds(pid_t pid, CGRect &bounds, bool &nativeFullscreen, bool
   decorated = buttonResult == kAXErrorSuccess && closeButton && CFGetTypeID(closeButton) == AXUIElementGetTypeID();
   if (closeButton)
     CFRelease(closeButton);
-  if (readBoolean(window, kAXMinimizedAttribute))
-    valid = false;
+  const bool minimized = readBoolean(window, kAXMinimizedAttribute);
   CFRelease(window);
-  return valid;
+  // Native fullscreen is authoritative even when the game does not publish
+  // usable geometry, or macOS reserves part of a notched display for compatibility.
+  return !minimized && (valid || nativeFullscreen);
 }
 
 bool coversDisplay(const CGRect &bounds)
@@ -137,7 +138,7 @@ ForegroundGameState queryForegroundGame(const QStringList &gameApps, const QStri
       state.detail = QStringLiteral("Foreground window does not expose fullscreen or decoration state");
       return state;
     }
-    state.fullscreen = displayCovered && (nativeFullscreen || !decorated);
+    state.fullscreen = nativeFullscreen || (displayCovered && !decorated);
     if (state.fullscreen && !state.game)
       state.detail =
           QStringLiteral("Fullscreen application is not recognised as a game; an application rule is required");

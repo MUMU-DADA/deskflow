@@ -44,6 +44,14 @@ jobs:
           QT_QPA_PLATFORM: offscreen
         run: ctest --test-dir build/src/unittests -C Release --output-on-failure
       - uses: actions/upload-artifact@v4
+        with:
+          name: deskflow-${{ matrix.os }}-fullscreen-game-guard
+          path: |
+            build/bin/
+            !build/bin/**/*.pdb
+            !build/bin/**/*.lib
+            !build/bin/**/*.exp
+      - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: test-logs-${{ matrix.os }}
@@ -63,7 +71,9 @@ jobs:
       - name: Tests
         env:
           QT_QPA_PLATFORM: offscreen
-        run: ctest --test-dir build/src/unittests --output-on-failure
+        run: |
+          ctest --test-dir build/src/unittests --output-on-failure
+          python3 -B deploy/linux/foreground-game-kwin/test_writer.py
       - uses: actions/upload-artifact@v4
         if: always()
         with:

@@ -391,8 +391,8 @@ bool ClientProxy1_0::isForegroundGameGuarded() const
 {
   // A capable client must report the foreground state for the new enter
   // sequence before edge crossing is allowed. Explicit hotkeys still work.
-  const bool awaitingObservation = !m_gameGuardKnown &&
-                                   std::chrono::steady_clock::now() - m_gameGuardEntered < std::chrono::seconds(2);
+  const bool awaitingObservation =
+      !m_gameGuardKnown && std::chrono::steady_clock::now() - m_gameGuardEntered < std::chrono::seconds(2);
   return m_gameGuardCapable && m_gameGuardActive && (awaitingObservation || m_gameGuarded);
 }
 
@@ -400,8 +400,8 @@ bool ClientProxy1_0::recvFullscreenGameGuard()
 {
   uint32_t sequence = 0;
   uint8_t guarded = 0;
-  if (!m_gameGuardAdvertised ||
-      !ProtocolUtil::readf(getStream(), kMsgDFullscreenGameGuard + 4, &sequence, &guarded) || guarded > 1) {
+  if (!m_gameGuardAdvertised || !ProtocolUtil::readf(getStream(), kMsgDFullscreenGameGuard + 4, &sequence, &guarded) ||
+      guarded > 1) {
     throw BadClientException();
   }
 

@@ -17,9 +17,9 @@
 #include "server/ClientProxy1_7.h"
 #include "server/ClientProxy1_8.h"
 
-#include <memory>
 #include <algorithm>
 #include <cstring>
+#include <memory>
 #include <string>
 #include <vector>
 
