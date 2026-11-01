@@ -27,6 +27,8 @@
 #include "gui/Messages.h"
 #include "gui/TlsUtility.h"
 #include "gui/core/CoreProcess.h"
+#include "gui/core/ScreenCalibrationController.h"
+#include "gui/ipc/CoreIpcClient.h"
 #include "gui/ipc/DaemonIpcClient.h"
 #include "gui/widgets/LogDock.h"
 #include "net/FingerprintDatabase.h"
@@ -82,6 +84,56 @@ MainWindow::MainWindow()
       m_networkMonitor{new NetworkMonitor(this)}
 {
   ui->setupUi(this);
+
+  // A dedicated registered GUI channel carries temporary edge markers. Core
+  // lifecycle notifications continue through CoreProcess's existing client.
+  m_calibrationIpcClient = new ipc::CoreIpcClient(this);
+  m_calibrationController = new ScreenCalibrationController(this);
+  auto *calibrationReconnect = new QTimer(this);
+  calibrationReconnect->setSingleShot(true);
+  calibrationReconnect->setInterval(2000);
+  connect(calibrationReconnect, &QTimer::timeout, this, [this] {
+    if (m_coreProcess.isStarted() && !m_calibrationIpcClient->isConnected())
+      m_calibrationIpcClient->connectToServer();
+  });
+  connect(m_calibrationIpcClient, &ipc::CoreIpcClient::connected, calibrationReconnect, &QTimer::stop);
+  connect(
+      m_calibrationIpcClient, &ipc::CoreIpcClient::connected, m_calibrationIpcClient,
+      &ipc::CoreIpcClient::registerAlignmentUi
+  );
+  connect(m_calibrationIpcClient, &ipc::CoreIpcClient::alignmentRegistered, this, [this] {
+    m_calibrationController->setTransportAvailable(true);
+  });
+  connect(
+      m_calibrationIpcClient, &ipc::CoreIpcClient::alignmentMessageReceived, m_calibrationController,
+      &ScreenCalibrationController::receiveMessage
+  );
+  connect(
+      m_calibrationController, &ScreenCalibrationController::sendMessage, m_calibrationIpcClient,
+      &ipc::CoreIpcClient::sendAlignmentMessage
+  );
+  const auto unavailable = [this, calibrationReconnect] {
+    m_calibrationController->setTransportAvailable(false);
+    if (m_coreProcess.isStarted() && !calibrationReconnect->isActive())
+      calibrationReconnect->start();
+  };
+  connect(m_calibrationIpcClient, &ipc::CoreIpcClient::connectionFailed, this, unavailable);
+  connect(m_calibrationIpcClient, &ipc::CoreIpcClient::serverShutdown, this, unavailable);
+  connect(m_calibrationIpcClient, &ipc::CoreIpcClient::versionMismatch, this, [this, calibrationReconnect] {
+    m_calibrationController->setTransportAvailable(false);
+    m_calibrationIpcClient->disconnectFromServer();
+    calibrationReconnect->stop();
+  });
+  connect(&m_coreProcess, &CoreProcess::processStateChanged, this, [this, calibrationReconnect](ProcessState state) {
+    if (state == ProcessState::Started) {
+      if (!m_calibrationIpcClient->isConnected())
+        m_calibrationIpcClient->connectToServer();
+    } else {
+      calibrationReconnect->stop();
+      m_calibrationController->setTransportAvailable(false);
+      m_calibrationIpcClient->disconnectFromServer();
+    }
+  });
 
   setWindowIcon(QIcon::fromTheme(kRevFqdnName));
 
@@ -165,6 +217,8 @@ MainWindow::MainWindow()
 }
 MainWindow::~MainWindow()
 {
+  m_calibrationController->cancel();
+  m_calibrationController->setTransportAvailable(false);
   // Stop network monitoring
   if (m_networkMonitor) {
     m_networkMonitor->stopMonitoring();
@@ -609,7 +663,7 @@ void MainWindow::updateNetworkInfo()
 void MainWindow::serverConnectionConfigureClient(const QString &clientName)
 {
   m_serverConfigDialogVisible = true;
-  ServerConfigDialog dialog(this, m_serverConfig);
+  ServerConfigDialog dialog(this, m_serverConfig, m_calibrationController);
   if (dialog.addClient(clientName) && dialog.exec() == QDialog::Accepted) {
     m_coreProcess.restart();
   }
@@ -1084,7 +1138,7 @@ void MainWindow::updateText()
 
 void MainWindow::showConfigureServer(const QString &message)
 {
-  ServerConfigDialog dialog(this, serverConfig());
+  ServerConfigDialog dialog(this, serverConfig(), m_calibrationController);
   dialog.message(message);
   if ((dialog.exec() == QDialog::Accepted) && m_coreProcess.isStarted()) {
     m_coreProcess.restart();

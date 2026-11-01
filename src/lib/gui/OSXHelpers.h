@@ -10,6 +10,8 @@
 
 #include <functional>
 
+class QWidget;
+
 void requestOSXNotificationPermission();
 bool isOSXDevelopmentBuild();
 bool showOSXNotification(const QString &title, const QString &body);
@@ -17,3 +19,5 @@ bool isOSXInterfaceStyleDark();
 void forceAppActive();
 void macOSNativeHide();
 void installQuitHandler(std::function<bool()> shouldQuit);
+// GUI main thread only; affects this temporary marker window, never app policy.
+bool raiseOSXScreenCalibrationMarker(QWidget *marker);

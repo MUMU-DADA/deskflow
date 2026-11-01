@@ -16,6 +16,8 @@
 #include "deskflow/IClipboard.h"
 #include "net/NetworkAddress.h"
 
+#include <QJsonObject>
+#include <chrono>
 #include <climits>
 #include <string>
 
@@ -112,6 +114,11 @@ public:
   */
   void connect(size_t addressIndex = 0);
   void setServerAddress(const NetworkAddress &address);
+  bool alignmentProtocolEnabled() const
+  {
+    return m_alignmentProtocol;
+  }
+  void receiveAlignmentMessage(const QJsonObject &message);
 
   //! Disconnect
   /*!
@@ -193,6 +200,10 @@ public:
 private:
   void saveRelativeRestorePosition();
   void reportFullscreenGameGuard();
+  void handleAlignmentLocal(const Event &event);
+  void reportAlignmentCapability();
+  void publishAlignmentCapabilities();
+  void cancelLocalAlignment(const QString &reason, bool notifyServer = true);
   void sendClipboard(ClipboardID);
   void sendEvent(deskflow::EventTypes);
   void sendConnectionFailedEvent(const char *msg);
@@ -229,6 +240,15 @@ private:
   EventQueueTimer *m_timer = nullptr;
   EventQueueTimer *m_gameGuardTimer = nullptr;
   bool m_gameGuardProtocol = false;
+  bool m_alignmentProtocol = false;
+  bool m_alignmentReported = false;
+  bool m_alignmentUiReady = false;
+  bool m_alignmentServerUiReady = false;
+  uint64_t m_alignmentUiGeneration = 0;
+  QString m_alignmentServerName;
+  QString m_alignmentSession;
+  QString m_alignmentOwner;
+  std::chrono::steady_clock::time_point m_alignmentExpires{};
   bool m_gameGuardReported = false;
   bool m_lastGameGuard = false;
   uint32_t m_gameGuardSequence = 0;

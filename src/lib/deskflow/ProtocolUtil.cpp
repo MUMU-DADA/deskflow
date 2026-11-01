@@ -104,6 +104,19 @@ bool ProtocolUtil::readf(deskflow::IStream *stream, const char *fmt, ...)
   return result;
 }
 
+bool ProtocolUtil::readStringWithLimit(deskflow::IStream *stream, std::string &value, uint32_t maximum)
+{
+  try {
+    const auto length = read4BytesInt(stream);
+    if (length == 0 || length > maximum)
+      throw BadClientException("Invalid bounded message length");
+    readBytes(stream, length, &value);
+    return true;
+  } catch (const IOException &) {
+    return false;
+  }
+}
+
 void ProtocolUtil::vwritef(deskflow::IStream *stream, const char *fmt, uint32_t size, va_list args)
 {
   assert(stream != nullptr);

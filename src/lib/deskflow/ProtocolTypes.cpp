@@ -8,6 +8,7 @@
 #include "deskflow/ProtocolTypes.h"
 
 const char *const kMsgDFullscreenGameGuard = "DFSG%4i%1i";
+const char *const kMsgDAlignment = "DCAL%s";
 
 // The protocol name string within the hello and hello back messages must be
 // 7 chars for backward compatibility (Synergy and Barrier are 7 chars).

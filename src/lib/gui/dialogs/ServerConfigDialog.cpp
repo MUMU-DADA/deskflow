@@ -24,7 +24,9 @@
 
 using enum ComputerConfig::SwitchCorner;
 
-ServerConfigDialog::ServerConfigDialog(QWidget *parent, ServerConfig &config)
+ServerConfigDialog::ServerConfigDialog(
+    QWidget *parent, ServerConfig &config, ScreenCalibrationController *calibrationController
+)
     : QDialog(parent, Qt::WindowTitleHint | Qt::WindowSystemMenuHint),
       ui{std::make_unique<Ui::ServerConfigDialog>()},
       m_columns{Settings::value(Settings::Server::GridWidth).toInt()},
@@ -34,7 +36,8 @@ ServerConfigDialog::ServerConfigDialog(QWidget *parent, ServerConfig &config)
       m_originalServerConfigUsesExternalFile(config.configFile()),
       m_serverConfig(config),
       m_computerSetupModel(m_serverConfig.computers(), m_columns, m_rows),
-      m_buttonBox{new SettingsDialogButtonBox(this)}
+      m_buttonBox{new SettingsDialogButtonBox(this)},
+      m_calibrationController(calibrationController)
 {
   ui->setupUi(this);
   ui->tabWidget->setCurrentIndex(0);
@@ -375,7 +378,7 @@ void ServerConfigDialog::editScreenAlignment()
   const auto index = ui->computerSetupView->currentIndex();
   if (index.isValid() && !model().computer(index).isNull())
     preferred = model().computer(index).name();
-  ScreenAlignmentDialog dialog(this, m_serverConfig, preferred);
+  ScreenAlignmentDialog dialog(this, m_serverConfig, preferred, m_calibrationController);
   if (dialog.exec() == QDialog::Accepted)
     setButtonBoxEnabledButtons();
 }

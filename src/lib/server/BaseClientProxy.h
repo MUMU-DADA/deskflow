@@ -8,6 +8,7 @@
 #pragma once
 
 #include "deskflow/IClient.h"
+#include <QJsonObject>
 
 namespace deskflow {
 class IStream;
@@ -53,6 +54,18 @@ public:
 
   //! Inhibit automatic edge transitions only; explicit switch commands bypass it.
   virtual bool isForegroundGameGuarded() const
+  {
+    return false;
+  }
+  virtual bool alignmentCapable() const
+  {
+    return false;
+  }
+  virtual bool alignmentUiReady() const
+  {
+    return false;
+  }
+  virtual bool sendAlignmentMessage(const QJsonObject &)
   {
     return false;
   }

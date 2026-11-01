@@ -7,6 +7,7 @@
 #include "IpcServer.h"
 
 #include "base/Log.h"
+#include "common/AlignmentProtocol.h"
 #include "common/VersionInfo.h"
 
 #include <QLocalServer>
@@ -52,6 +53,7 @@ void IpcServer::handleNewConnection()
 
   LOG_DEBUG("%s ipc server got new connection", m_typeName.constData());
   m_clients.insert(clientSocket);
+  clientSocket->setReadBufferSize(deskflow::alignment::maxIpcLineBytes + 1);
 
   connect(clientSocket, &QLocalSocket::readyRead, this, &IpcServer::handleReadyRead);
   connect(clientSocket, &QLocalSocket::disconnected, this, &IpcServer::handleDisconnected);
@@ -63,26 +65,26 @@ void IpcServer::handleReadyRead()
   const auto clientSocket = qobject_cast<QLocalSocket *>(sender());
   LOG_VERBOSE("%s ipc server ready to read data", m_typeName.constData());
 
-  QByteArray data = clientSocket->readAll();
-  if (data.isEmpty()) {
-    LOG_WARN("%s ipc server got empty message", m_typeName.constData());
-    return;
-  }
-
-  // we don't handle incomplete messages yet; each socket read must have delimiters.
-  if (!data.contains('\n')) {
-    LOG_WARN("%s ipc server got incomplete message: %s", m_typeName.constData(), data.constData());
-    return;
-  }
-
-  // each message is delimited by a newline to keep the protocol super simple.
+  QByteArray data = m_readBuffers.take(clientSocket) + clientSocket->readAll();
   while (data.contains('\n')) {
     const auto index = data.indexOf('\n');
+    if (index > deskflow::alignment::maxIpcLineBytes) {
+      clientSocket->abort();
+      return;
+    }
     QByteArray messageData = data.left(index);
     data.remove(0, index + 1);
     QString message = QString::fromUtf8(messageData);
     processMessage(clientSocket, message);
+    if (clientSocket->state() == QLocalSocket::UnconnectedState)
+      return;
   }
+  if (data.size() > deskflow::alignment::maxIpcLineBytes) {
+    clientSocket->abort();
+    return;
+  }
+  if (!data.isEmpty())
+    m_readBuffers.insert(clientSocket, data);
 }
 
 void IpcServer::handleDisconnected()
@@ -90,6 +92,9 @@ void IpcServer::handleDisconnected()
   const auto clientSocket = qobject_cast<QLocalSocket *>(sender());
   LOG_DEBUG("%s ipc server client disconnected", m_typeName.constData());
   m_clients.remove(clientSocket);
+  m_handshakenClients.remove(clientSocket);
+  m_readBuffers.remove(clientSocket);
+  clientRemoved(clientSocket);
   clientSocket->deleteLater();
 }
 
@@ -103,13 +108,18 @@ void IpcServer::handleErrorOccurred()
   }
 
   m_clients.remove(clientSocket);
+  m_handshakenClients.remove(clientSocket);
+  m_readBuffers.remove(clientSocket);
+  clientRemoved(clientSocket);
   clientSocket->deleteLater();
 }
 
 void IpcServer::processMessage(QLocalSocket *clientSocket, const QString &message)
 {
   LOG_VERBOSE("%s ipc server got message: %s", m_typeName.constData(), message.toUtf8().constData());
-  const auto parts = message.split('=');
+  const auto delimiter = message.indexOf('=');
+  const QStringList parts =
+      delimiter < 0 ? QStringList{message} : QStringList{message.left(delimiter), message.mid(delimiter + 1)};
   if (parts.isEmpty()) {
     LOG_ERR("%s ipc server got invalid message: %s", m_typeName.constData(), message.toUtf8().constData());
     writeToClientSocket(clientSocket, QStringLiteral("error"));
@@ -130,6 +140,7 @@ void IpcServer::processMessage(QLocalSocket *clientSocket, const QString &messag
     LOG_DEBUG("%s ipc server got hello message (version: %s)", m_typeName.constData(), versionId.toUtf8().constData());
 
     if (clientVersion != versionId) {
+      m_handshakenClients.remove(clientSocket);
       LOG_WARN(
           "%s ipc client version mismatch (client: %s, server: %s)", m_typeName.constData(),
           clientVersion.toUtf8().constData(), versionId.toUtf8().constData()
@@ -140,6 +151,7 @@ void IpcServer::processMessage(QLocalSocket *clientSocket, const QString &messag
     }
 
     LOG_DEBUG("%s ipc server sending hello back", m_typeName.constData());
+    m_handshakenClients.insert(clientSocket);
     writeToClientSocket(clientSocket, QStringLiteral("hello=%1").arg(versionId));
 
     // Replay messages that were queued before any clients connected.
@@ -157,6 +169,11 @@ void IpcServer::processMessage(QLocalSocket *clientSocket, const QString &messag
   }
 
   clientSocket->flush();
+}
+
+bool IpcServer::hasHandshake(QLocalSocket *clientSocket) const
+{
+  return m_handshakenClients.contains(clientSocket);
 }
 
 void IpcServer::broadcastCommand(const QString &command, const QString &args)

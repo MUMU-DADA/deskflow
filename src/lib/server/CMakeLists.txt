@@ -37,6 +37,7 @@ add_library(server STATIC
   PrimaryClient.cpp
   PrimaryClient.h
   Server.cpp
+  AlignmentSession.h
   Server.h
 )
 

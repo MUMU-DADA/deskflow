@@ -26,3 +26,32 @@ void ipcSendConnectionState(deskflow::core::ConnectionState state)
   const auto metaEnum = QMetaEnum::fromType<deskflow::core::ConnectionState>();
   ipcSendToClient(QStringLiteral("connectionState"), metaEnum.valueToKey(static_cast<int>(state)));
 }
+
+void *alignmentEventTarget()
+{
+  static int target;
+  return &target;
+}
+
+void ipcAlignmentCoreReady(const QString &name, const QString &role)
+{
+  if (auto *server = deskflow::core::ipc::CoreIpcServer::maybeInstance())
+    QMetaObject::invokeMethod(
+        server, [server, name, role] { server->alignmentCoreReady(name, role); }, Qt::QueuedConnection
+    );
+}
+
+void ipcAlignmentCoreStopped()
+{
+  if (auto *server = deskflow::core::ipc::CoreIpcServer::maybeInstance())
+    QMetaObject::invokeMethod(server, [server] { server->alignmentCoreStopped(); }, Qt::QueuedConnection);
+}
+
+void ipcSendAlignment(const QJsonObject &message, uint64_t uiGeneration)
+{
+  if (auto *server = deskflow::core::ipc::CoreIpcServer::maybeInstance())
+    QMetaObject::invokeMethod(
+        server, [server, message, uiGeneration] { server->deliverAlignment(message, uiGeneration); },
+        Qt::QueuedConnection
+    );
+}

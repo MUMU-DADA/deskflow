@@ -28,4 +28,13 @@ private Q_SLOTS:
   void movedPairKeepsCalibration();
   void serverRenameClearsCalibration();
   void malformedMetadataIgnored();
+  void calibrationTransform_data();
+  void calibrationTransform();
+  void calibrationValidation();
+  void calibrationThirdPoint();
+  void relativeGeometryAndIntervals();
+  void calibrationPersistence();
+  void malformedCalibrationMetadata_data();
+  void malformedCalibrationMetadata();
+  void manualReplacesCalibration();
 };

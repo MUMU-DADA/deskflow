@@ -26,6 +26,11 @@ ScreenAlignment sample()
   return {"Windows", "Mac", Qt::Horizontal, {600, 300}, {300, 600}, -120, true};
 }
 
+ScreenEdgeCalibration calibrationSample()
+{
+  return {{0.25, 0.3125}, {0.75, 0.5625}, 16.0 / 9.0, 9.0 / 16.0};
+}
+
 void seedComputers(const QMap<int, QString> &names = {{6, "Windows"}, {7, "Mac"}})
 {
   auto &settings = Settings::proxy();
@@ -349,6 +354,239 @@ void ScreenAlignmentTests::malformedMetadataIgnored()
   QVERIFY(!exported(malformed).contains("right("));
   malformed.commit();
   QCOMPARE(storedAlignments(), 0);
+}
+
+void ScreenAlignmentTests::calibrationTransform_data()
+{
+  QTest::addColumn<double>("firstA");
+  QTest::addColumn<double>("secondA");
+  QTest::addColumn<double>("firstB");
+  QTest::addColumn<double>("secondB");
+  QTest::addColumn<double>("ratio");
+  QTest::addColumn<double>("offset");
+  QTest::newRow("equal") << 0.2 << 0.2 << 0.8 << 0.8 << 1.0 << 0.0;
+  QTest::newRow("taller") << 0.2 << 0.3 << 0.8 << 0.6 << 2.0 << -0.4;
+  QTest::newRow("shorter") << 0.3 << 0.2 << 0.6 << 0.8 << 0.5 << 0.2;
+  QTest::newRow("positive-offset") << 0.3 << 0.1 << 0.9 << 0.4 << 2.0 << 0.1;
+  QTest::newRow("both-colors-reversed") << 0.8 << 0.6 << 0.2 << 0.3 << 2.0 << -0.4;
+  QTest::newRow("decimal-minimum-spacing") << 0.2 << 0.2 << 0.3 << 0.3 << 1.0 << 0.0;
+  QTest::newRow("boundary-points") << 0.0 << 0.0 << 1.0 << 1.0 << 1.0 << 0.0;
+  QTest::newRow("fractional-fit") << 0.2875 << 0.25 << 0.9875 << 0.65 << 1.75 << -0.15;
+}
+
+void ScreenAlignmentTests::calibrationTransform()
+{
+  QFETCH(double, firstA);
+  QFETCH(double, secondA);
+  QFETCH(double, firstB);
+  QFETCH(double, secondB);
+  QFETCH(double, ratio);
+  QFETCH(double, offset);
+  ScreenEdgeCalibration calibration{{firstA, secondA}, {firstB, secondB}};
+  QCOMPARE(calibration.error(), ScreenEdgeCalibration::Error::None);
+  const auto fitted = calibration.transform();
+  QVERIFY(fitted);
+  QVERIFY(std::abs(fitted->ratio - ratio) < 1e-12);
+  QVERIFY(std::abs(fitted->offset - offset) < 1e-12);
+  QVERIFY(std::abs(*calibration.validationResidual(calibration.a)) < 1e-12);
+  QVERIFY(std::abs(*calibration.validationResidual(calibration.b)) < 1e-12);
+
+  calibration.firstAspectRatio = 0.5;
+  calibration.secondAspectRatio = 3;
+  QVERIFY(calibration.transform() == fitted); // Preview shape cannot change edge calibration.
+}
+
+void ScreenAlignmentTests::calibrationValidation()
+{
+  using Error = ScreenEdgeCalibration::Error;
+  const double nan = std::numeric_limits<double>::quiet_NaN();
+  const double infinity = std::numeric_limits<double>::infinity();
+  for (double invalid : {nan, infinity, -infinity, -0.001, 1.001}) {
+    for (int component = 0; component < 4; ++component) {
+      auto calibration = calibrationSample();
+      double *positions[] = {&calibration.a.first, &calibration.a.second, &calibration.b.first, &calibration.b.second};
+      *positions[component] = invalid;
+      QCOMPARE(calibration.error(), std::isfinite(invalid) ? Error::OutOfRange : Error::NonFinite);
+      QVERIFY(!calibration.transform());
+    }
+  }
+  for (bool first : {false, true}) {
+    for (double distance : {0.0, 0.099, 0.1 - 1e-10}) {
+      auto calibration = calibrationSample();
+      if (first)
+        calibration.b.first = calibration.a.first + distance;
+      else
+        calibration.b.second = calibration.a.second + distance;
+      QCOMPARE(calibration.error(), Error::PointsTooClose);
+      QVERIFY(!calibration.transform());
+    }
+  }
+  auto calibration = calibrationSample();
+  std::swap(calibration.a.second, calibration.b.second);
+  QCOMPARE(calibration.error(), Error::Reversed);
+  QVERIFY(!calibration.transform());
+  for (double aspect : {0.0, -1.0, nan, infinity, std::numeric_limits<double>::denorm_min()}) {
+    for (bool first : {false, true}) {
+      calibration = calibrationSample();
+      if (first)
+        calibration.firstAspectRatio = aspect;
+      else
+        calibration.secondAspectRatio = aspect;
+      QCOMPARE(calibration.error(), Error::InvalidAspectRatio);
+      QVERIFY(!calibration.transform());
+    }
+  }
+}
+
+void ScreenAlignmentTests::calibrationThirdPoint()
+{
+  const auto calibration = calibrationSample(); // first = -0.375 + 2 * second
+  const auto original = calibration.transform();
+  QCOMPARE(*calibration.validationResidual({0.5, 0.4375}), 0.0);
+  QVERIFY(std::abs(*calibration.validationResidual({0.52, 0.4375}) - 0.02) < 1e-12);
+  QVERIFY(std::abs(*calibration.validationResidual({0.48, 0.4375}) + 0.02) < 1e-12);
+  QVERIFY(!calibration.validationResidual({-0.1, 0.4}));
+  QVERIFY(!calibration.validationResidual({0.4, 1.1}));
+  QVERIFY(!calibration.validationResidual({std::numeric_limits<double>::quiet_NaN(), 0.4}));
+  QVERIFY(calibration.transform() == original); // Validation never refits the two anchors.
+}
+
+void ScreenAlignmentTests::relativeGeometryAndIntervals()
+{
+  auto alignment = sample();
+  const auto manual = alignment.visualGeometry();
+  QVERIFY(manual);
+  QVERIFY(!manual->relative);
+  QCOMPARE(manual->firstSize, alignment.firstSizeMm);
+  QCOMPARE(manual->offset, alignment.offsetMm);
+
+  alignment.calibration = calibrationSample();
+  alignment.firstSizeMm = {};
+  alignment.secondSizeMm = {};
+  alignment.offsetMm = std::numeric_limits<double>::quiet_NaN();
+  QVERIFY(alignment.isValid()); // Unmeasured manual dimensions are irrelevant in relative mode.
+  const auto horizontal = alignment.visualGeometry();
+  QVERIFY(horizontal);
+  QVERIFY(horizontal->relative);
+  QCOMPARE(horizontal->firstSize, QSizeF(16.0 / 9.0, 1));
+  QCOMPARE(horizontal->secondSize, QSizeF(2 * 9.0 / 16.0, 2));
+  QCOMPARE(horizontal->offset, -0.375);
+  const auto intervals = alignment.intervals();
+  QVERIFY(intervals);
+  QVERIFY(intervals->hasOverlap);
+  QCOMPARE(intervals->first.startPercent, 0.0);
+  QCOMPARE(intervals->first.endPercent, 100.0);
+  QCOMPARE(intervals->second.startPercent, 18.75);
+  QCOMPARE(intervals->second.endPercent, 68.75);
+
+  alignment.orientation = Qt::Vertical;
+  const auto vertical = alignment.visualGeometry();
+  QVERIFY(vertical);
+  QVERIFY(vertical->relative);
+  QCOMPARE(vertical->firstSize, QSizeF(1, 9.0 / 16.0));
+  QCOMPARE(vertical->secondSize, QSizeF(2, 2 * 16.0 / 9.0));
+  QVERIFY(alignment.intervals() == intervals);
+
+  alignment.calibration->b.first = alignment.calibration->a.first;
+  QVERIFY(!alignment.isValid());
+  QVERIFY(!alignment.visualGeometry());
+  QVERIFY(!alignment.intervals());
+}
+
+void ScreenAlignmentTests::calibrationPersistence()
+{
+  seedComputers({{6, "Windows"}, {7, "Mac"}, {8, "Linux"}});
+  ServerConfig config;
+  auto calibrated = sample();
+  calibrated.calibration = calibrationSample();
+  calibrated.calibration->firstAspectRatio = 1.7777777777771234;
+  calibrated.calibration->secondAspectRatio = 0.5625000000001234;
+  QVERIFY(config.setScreenAlignment(calibrated));
+  auto manual = sample();
+  manual.firstName = "Mac";
+  manual.secondName = "Linux";
+  QVERIFY(config.setScreenAlignment(manual));
+  const auto before = exported(config);
+  QVERIFY(before.contains("right(0,100) = Mac(18.75,68.75)\n"));
+  QVERIFY(before.contains("left(18.75,68.75) = Windows(0,100)\n"));
+  calibrated.calibration->a.first = 0.2345678901234567;
+  calibrated.calibration->b.first = 0.7654321098765432;
+  QVERIFY(config.setScreenAlignment(calibrated));
+  const auto persistedExport = exported(config);
+  config.commit();
+  Settings::proxy().sync();
+  Settings::save(false);
+  const auto prefix = QStringLiteral("internalConfig/screenAlignments/");
+  QCOMPARE(Settings::proxy().value(prefix + "1/version").toInt(), 2);
+  QCOMPARE(Settings::proxy().value(prefix + "1/method").toString(), "two-point");
+  for (const auto &key : {"firstWidthMm", "firstHeightMm", "secondWidthMm", "secondHeightMm", "offsetMm"})
+    QVERIFY(!Settings::proxy().contains(prefix + "1/" + key));
+  QCOMPARE(Settings::proxy().value(prefix + "2/version").toInt(), 1);
+  QVERIFY(Settings::proxy().contains(prefix + "2/firstWidthMm"));
+
+  ServerConfig loaded;
+  QVERIFY(loaded == config);
+  const auto recalled = loaded.screenAlignment(calibrated.pair());
+  QVERIFY(recalled);
+  QVERIFY(recalled->calibration == calibrated.calibration);
+  QVERIFY(recalled->firstSizeMm.isEmpty()); // No invented physical dimensions on load.
+  QVERIFY(recalled->secondSizeMm.isEmpty());
+  QVERIFY(!loaded.screenAlignment(manual.pair())->calibration);
+  QCOMPARE(exported(loaded), persistedExport);
+  QCOMPARE(storedAlignments(), 2);
+}
+
+void ScreenAlignmentTests::malformedCalibrationMetadata_data()
+{
+  QTest::addColumn<QString>("key");
+  QTest::addColumn<QString>("value");
+  QTest::newRow("non-finite") << "firstA" << "nan";
+  QTest::newRow("outside-edge") << "secondA" << "1.1";
+  QTest::newRow("points-too-close") << "firstB" << "0.26";
+  QTest::newRow("reversed") << "secondB" << "0.1";
+  QTest::newRow("invalid-aspect") << "firstAspectRatio" << "0";
+  QTest::newRow("unknown-method") << "method" << "future-method";
+  QTest::newRow("missing-coordinate") << "secondB" << "";
+}
+
+void ScreenAlignmentTests::malformedCalibrationMetadata()
+{
+  QFETCH(QString, key);
+  QFETCH(QString, value);
+  ServerConfig config;
+  auto calibrated = sample();
+  calibrated.calibration = calibrationSample();
+  QVERIFY(config.setScreenAlignment(calibrated));
+  config.commit();
+  const auto path = "internalConfig/screenAlignments/1/" + key;
+  if (value.isEmpty())
+    Settings::proxy().remove(path);
+  else
+    Settings::proxy().setValue(path, value);
+  ServerConfig loaded;
+  QVERIFY(!loaded.screenAlignment(calibrated.pair()));
+  QVERIFY(exported(loaded).contains("right = Mac\n"));
+  loaded.commit();
+  QCOMPARE(storedAlignments(), 0);
+}
+
+void ScreenAlignmentTests::manualReplacesCalibration()
+{
+  ServerConfig config;
+  auto alignment = sample();
+  alignment.calibration = calibrationSample();
+  QVERIFY(config.setScreenAlignment(alignment));
+  config.commit();
+  QVERIFY(config.setScreenAlignment(sample()));
+  config.commit();
+  const auto prefix = QStringLiteral("internalConfig/screenAlignments/1/");
+  QCOMPARE(Settings::proxy().value(prefix + "version").toInt(), 1);
+  QVERIFY(!Settings::proxy().contains(prefix + "firstA"));
+  QVERIFY(!Settings::proxy().contains(prefix + "method"));
+  ServerConfig loaded;
+  QVERIFY(loaded == config);
+  QVERIFY(!loaded.screenAlignment(sample().pair())->calibration);
+  QVERIFY(exported(loaded).contains("right(0,100) = Mac(20,70)\n"));
 }
 
 int main(int argc, char **argv)

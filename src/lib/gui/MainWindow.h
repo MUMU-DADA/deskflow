@@ -32,6 +32,7 @@ class QLocalServer;
 class DeskflowApplication;
 class LogDock;
 class StatusBar;
+class ScreenCalibrationController;
 
 namespace Ui {
 class MainWindow;
@@ -181,6 +182,8 @@ private:
   QSystemTrayIcon *m_trayIcon = nullptr;
   QLocalServer *m_guiDupeChecker = nullptr;
   deskflow::gui::ipc::DaemonIpcClient *m_daemonIpcClient = nullptr;
+  deskflow::gui::ipc::CoreIpcClient *m_calibrationIpcClient = nullptr;
+  ScreenCalibrationController *m_calibrationController = nullptr;
 
   LogDock *m_logDock;
   StatusBar *m_statusBar = nullptr;

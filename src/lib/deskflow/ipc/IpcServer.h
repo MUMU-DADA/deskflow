@@ -6,6 +6,7 @@
 
 #pragma once
 
+#include <QHash>
 #include <QObject>
 #include <QSet>
 
@@ -40,6 +41,10 @@ protected:
    * \param message The message to write (without trailing newline).
    */
   void writeToClientSocket(QLocalSocket *&clientSocket, const QString &message) const;
+  bool hasHandshake(QLocalSocket *clientSocket) const;
+  virtual void clientRemoved(QLocalSocket *)
+  {
+  }
 
 private:
   void processMessage(QLocalSocket *clientSocket, const QString &message);
@@ -51,6 +56,8 @@ private:
 
   QLocalServer *m_server;
   QSet<QLocalSocket *> m_clients;
+  QSet<QLocalSocket *> m_handshakenClients;
+  QHash<QLocalSocket *, QByteArray> m_readBuffers;
   QString m_serverName;
   QStringList m_pendingMessages;
   QByteArray m_typeName;

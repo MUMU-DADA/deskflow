@@ -108,7 +108,7 @@ void ServerConfig::commit()
   for (int i = 0; i < m_screenAlignments.size(); ++i) {
     settings().setArrayIndex(i);
     const auto &alignment = m_screenAlignments[i];
-    settings().setValue("version", 1);
+    settings().setValue("version", alignment.calibration ? 2 : 1);
     settings().setValue("firstName", alignment.firstName);
     settings().setValue("secondName", alignment.secondName);
     settings().setValue("orientation", alignment.orientation == Qt::Horizontal ? "horizontal" : "vertical");
@@ -116,11 +116,22 @@ void ServerConfig::commit()
     const auto decimal = [](double value) {
       return QString::number(value, 'g', std::numeric_limits<double>::max_digits10);
     };
-    settings().setValue("firstWidthMm", decimal(alignment.firstSizeMm.width()));
-    settings().setValue("firstHeightMm", decimal(alignment.firstSizeMm.height()));
-    settings().setValue("secondWidthMm", decimal(alignment.secondSizeMm.width()));
-    settings().setValue("secondHeightMm", decimal(alignment.secondSizeMm.height()));
-    settings().setValue("offsetMm", decimal(alignment.offsetMm));
+    if (alignment.calibration) {
+      const auto &calibration = *alignment.calibration;
+      settings().setValue("method", "two-point");
+      settings().setValue("firstA", decimal(calibration.a.first));
+      settings().setValue("secondA", decimal(calibration.a.second));
+      settings().setValue("firstB", decimal(calibration.b.first));
+      settings().setValue("secondB", decimal(calibration.b.second));
+      settings().setValue("firstAspectRatio", decimal(calibration.firstAspectRatio));
+      settings().setValue("secondAspectRatio", decimal(calibration.secondAspectRatio));
+    } else {
+      settings().setValue("firstWidthMm", decimal(alignment.firstSizeMm.width()));
+      settings().setValue("firstHeightMm", decimal(alignment.firstSizeMm.height()));
+      settings().setValue("secondWidthMm", decimal(alignment.secondSizeMm.width()));
+      settings().setValue("secondHeightMm", decimal(alignment.secondSizeMm.height()));
+      settings().setValue("offsetMm", decimal(alignment.offsetMm));
+    }
   }
   settings().endArray();
 
@@ -164,7 +175,9 @@ void ServerConfig::recall()
   for (int i = 0; i < numAlignments; ++i) {
     settings().setArrayIndex(i);
     const auto orientation = settings().value("orientation").toString();
-    if (settings().value("version").toInt() != 1 || (orientation != "horizontal" && orientation != "vertical"))
+    const int version = settings().value("version").toInt();
+    if ((version != 1 && version != 2) || (orientation != "horizontal" && orientation != "vertical") ||
+        (version == 2 && settings().value("method").toString() != "two-point"))
       continue;
     ScreenAlignment alignment;
     alignment.firstName = settings().value("firstName").toString();
@@ -178,9 +191,18 @@ void ServerConfig::recall()
       numericValuesValid = numericValuesValid && ok;
       return value;
     };
-    alignment.firstSizeMm = {readNumber("firstWidthMm"), readNumber("firstHeightMm")};
-    alignment.secondSizeMm = {readNumber("secondWidthMm"), readNumber("secondHeightMm")};
-    alignment.offsetMm = readNumber("offsetMm");
+    if (version == 2) {
+      ScreenEdgeCalibration calibration;
+      calibration.a = {readNumber("firstA"), readNumber("secondA")};
+      calibration.b = {readNumber("firstB"), readNumber("secondB")};
+      calibration.firstAspectRatio = readNumber("firstAspectRatio");
+      calibration.secondAspectRatio = readNumber("secondAspectRatio");
+      alignment.calibration = calibration;
+    } else {
+      alignment.firstSizeMm = {readNumber("firstWidthMm"), readNumber("firstHeightMm")};
+      alignment.secondSizeMm = {readNumber("secondWidthMm"), readNumber("secondHeightMm")};
+      alignment.offsetMm = readNumber("offsetMm");
+    }
     if (numericValuesValid && alignment.intervals())
       m_screenAlignments.append(alignment);
     else

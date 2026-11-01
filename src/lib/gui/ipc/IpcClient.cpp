@@ -6,6 +6,7 @@
 
 #include "IpcClient.h"
 
+#include "common/AlignmentProtocol.h"
 #include "common/VersionInfo.h"
 
 #include <QDebug>
@@ -20,6 +21,7 @@ IpcClient::IpcClient(QObject *parent, const QString &socketName, const QString &
       m_socketName(socketName), // NOSONAR - Qt memory
       m_typeName(typeName)
 {
+  m_socket->setReadBufferSize(deskflow::alignment::maxIpcLineBytes + 1);
   connect(m_socket, &QLocalSocket::disconnected, this, &IpcClient::handleDisconnected);
   connect(m_socket, &QLocalSocket::errorOccurred, this, &IpcClient::handleErrorOccurred);
   connect(m_socket, &QLocalSocket::readyRead, this, &IpcClient::handleReadyRead);
@@ -82,6 +84,7 @@ void IpcClient::attemptConnection()
 
 void IpcClient::disconnectFromServer()
 {
+  m_readBuffer.clear();
   m_state = State::Disconnecting;
   qDebug().noquote() << QStringLiteral("%1 ipc client disconnecting from server").arg(m_typeName);
   m_socket->disconnectFromServer();
@@ -90,6 +93,8 @@ void IpcClient::disconnectFromServer()
 
 void IpcClient::handleDisconnected()
 {
+  m_readBuffer.clear();
+  Q_EMIT disconnected();
   if (m_state == State::Connecting) {
     return;
   }
@@ -124,11 +129,18 @@ void IpcClient::handleReadyRead()
 
   while (data.contains('\n')) {
     const auto index = data.indexOf('\n');
+    if (index > deskflow::alignment::maxIpcLineBytes) {
+      disconnectFromServer();
+      Q_EMIT connectionFailed();
+      return;
+    }
     const auto message = QString::fromUtf8(data.left(index));
     data.remove(0, index + 1);
 
     qDebug().noquote() << QStringLiteral("%1 ipc client message: %2").arg(m_typeName, message);
-    const auto parts = message.split('=');
+    const auto delimiter = message.indexOf('=');
+    const QStringList parts =
+        delimiter < 0 ? QStringList{message} : QStringList{message.left(delimiter), message.mid(delimiter + 1)};
     if (parts.isEmpty()) {
       qWarning().noquote() << QStringLiteral("%1 ipc client got invalid message: %2").arg(m_typeName, message);
       continue;
@@ -149,7 +161,10 @@ void IpcClient::handleReadyRead()
     processCommand(parts.at(0), parts);
   }
 
-  if (!data.isEmpty()) {
+  if (data.size() > deskflow::alignment::maxIpcLineBytes) {
+    disconnectFromServer();
+    Q_EMIT connectionFailed();
+  } else if (!data.isEmpty()) {
     m_readBuffer = data;
   }
 }

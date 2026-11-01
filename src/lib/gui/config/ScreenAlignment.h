@@ -39,6 +39,61 @@ struct ScreenAlignmentIntervals
   bool operator==(const ScreenAlignmentIntervals &) const = default;
 };
 
+// One color's matching positions, measured from the top (side-by-side) or
+// left (stacked) along each complete edge. Coordinates are dimensionless.
+struct ScreenEdgePoint
+{
+  double first = 0;
+  double second = 0;
+
+  bool operator==(const ScreenEdgePoint &) const = default;
+};
+
+struct ScreenEdgeTransform
+{
+  // In units of the first edge's length: first = offset + ratio * second.
+  double ratio = 1;
+  double offset = 0;
+
+  bool operator==(const ScreenEdgeTransform &) const = default;
+};
+
+struct ScreenEdgeCalibration
+{
+  enum class Error
+  {
+    None,
+    NonFinite,
+    OutOfRange,
+    PointsTooClose,
+    Reversed,
+    InvalidAspectRatio
+  };
+
+  ScreenEdgePoint a{0.2, 0.2};
+  ScreenEdgePoint b{0.8, 0.8};
+  // Width / height, used only to draw a schematic preview. These do not
+  // contribute to the edge calibration or imply measured physical dimensions.
+  double firstAspectRatio = 16.0 / 9.0;
+  double secondAspectRatio = 16.0 / 9.0;
+
+  static constexpr double minimumPointSeparation = 0.1;
+  Error error() const;
+  std::optional<ScreenEdgeTransform> transform() const;
+  // Signed discrepancy in units of the first edge's length. A check point
+  // never changes the transform derived from a and b.
+  std::optional<double> validationResidual(const ScreenEdgePoint &point) const;
+  bool operator==(const ScreenEdgeCalibration &) const = default;
+};
+
+struct ScreenAlignmentVisualGeometry
+{
+  QSizeF firstSize;
+  QSizeF secondSize;
+  double offset = 0;
+  bool relative = false; // When true, sizes and offset have no physical unit.
+};
+
 struct ScreenAlignment
 {
   QString firstName;
@@ -49,11 +104,15 @@ struct ScreenAlignment
   // Second top relative to first top; for vertical adjacency, second left relative to first left.
   double offsetMm = 0;
   bool enabled = false;
+  // When present, calibration is authoritative. The manual millimeter fields
+  // are unused and must not be displayed as measured calibration results.
+  std::optional<ScreenEdgeCalibration> calibration;
 
   ScreenAlignmentPair pair() const;
   bool isValid() const;
+  std::optional<ScreenAlignmentVisualGeometry> visualGeometry() const;
   // nullopt means invalid/unrepresentable geometry. A valid disjoint pair has hasOverlap=false.
   // Calculation is independent of enabled, so a preview can display a disabled draft.
   std::optional<ScreenAlignmentIntervals> intervals() const;
-  bool operator==(const ScreenAlignment &) const = default;
+  bool operator==(const ScreenAlignment &) const;
 };

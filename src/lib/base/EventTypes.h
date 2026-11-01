@@ -45,6 +45,11 @@ enum class EventTypes : uint32_t
    */
   ClientDisconnectRequested,
 
+  /// Main-thread GUI IPC requests and registration state, delivered on the core event queue.
+  AlignmentLocal,
+  /// Negotiated calibration messages/status received from a client connection.
+  AlignmentPeer,
+
   /// A stream sends this event when \c read() will return with data.
   StreamInputReady,
 

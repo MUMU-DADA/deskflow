@@ -1066,6 +1066,26 @@ Green sections allow crossing; the remaining edge is blocked.</source>
         <source>Close Screen alignment and reopen it for the current layout.</source>
         <translation type="unfinished"></translation>
     </message>
+    <message>
+        <source>Calibrate on the actual screens…</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Match blue A and orange B markers across the two real screen edges. No ruler is needed.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Use manual dimensions</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Calibrated from edge markers. Relative edge length 1 : %1; offset %2% of the first edge. The preview shows proportions, not millimeters.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Drag matching colored markers on the actual screens, or enter the measurements below.</source>
+        <translation type="unfinished"></translation>
+    </message>
 </context>
 <context>
     <name>ScreenAlignmentPreview</name>
@@ -1087,6 +1107,256 @@ Green sections allow crossing; the remaining edge is blocked.</source>
     </message>
     <message>
         <source>%1 × %2 mm</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>This preview shows relative proportions. Recalibrate on the real screens to change the alignment.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Adjust the screen-edge points to preview the alignment.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Relative scale</source>
+        <translation type="unfinished"></translation>
+    </message>
+</context>
+<context>
+    <name>ScreenCalibrationController</name>
+    <message>
+        <source>The other computer did not show its markers. Check that both computers run the updated Deskflow GUI.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Calibration timed out. Start it again when you are ready.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Another screen calibration is already running.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Start Deskflow and connect both computers before calibrating their edges.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>The Deskflow connection was interrupted. Your previous alignment has been kept.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Calibration is not running.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Waiting for both computers to display their edge markers…</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Move A and B farther apart on both screens (at least 10% of each edge).</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Keep A and B in the same order on both screens.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>The third point does not match. Recheck A, B and C before using this calibration.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>These marker positions cannot produce a usable alignment.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Align each matching color in the real world, then choose Use calibration.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Relative edge length: %1 : %2
+Second-screen offset: %3% of the first edge. No millimeter measurement is required.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Third-point discrepancy: %1% of the first edge.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>The display geometry changed or is unsupported. Restart calibration on a single display per computer.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Update Deskflow on both computers to use on-screen edge markers. Manual alignment remains available.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Open the updated Deskflow GUI on both computers, connect them, then try again.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>The other computer has an open dialog or calibration. Close it and try again.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Calibration was cancelled. Your previous alignment has been kept.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>This Wayland session cannot position edge markers precisely. Use manual screen alignment here.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Edge markers currently require one display per computer. Display changes cancel calibration.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Calibration stopped because a computer or its display is no longer available. Your previous alignment has been kept.</source>
+        <translation type="unfinished"></translation>
+    </message>
+</context>
+<context>
+    <name>ScreenCalibrationDialog</name>
+    <message>
+        <source>Align the colored markers</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Look at the markers on the real displays. Drag the blue A markers until they line up across the seam, then align the orange B markers. Keep the two colors well apart on each display.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>A — blue</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>B — orange</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Use the matching letters as well as the colors. Two matched positions determine the relative edge size and offset; no ruler or millimeter measurements are needed.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>The preview will appear when both displays are ready.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Check the alignment with a third green C marker</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>The optional C markers check the remaining error. They do not change the calibration from A and B.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Use calibration returns this result to Screen alignment. Save there and in Server Configuration to apply it.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Use calibration</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Retry</source>
+        <translation type="unfinished">재시도</translation>
+    </message>
+    <message>
+        <source>The calibration connection is no longer available.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Another screen calibration is already running.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Calibration could not start. Check that both computers are connected, then retry.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>%1: stopped</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>%1: ready</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>%1: waiting for markers…</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Preview shows the last valid alignment. Adjust the markers or retry to continue.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>The preview will appear when both displays have valid marker positions.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>No valid measurement yet.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Waiting for both displays to show the markers.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>The displayed preview is the last valid result; it cannot be used yet.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Calibration stopped. Retry when both computers are ready.</source>
+        <translation type="unfinished"></translation>
+    </message>
+</context>
+<context>
+    <name>ScreenCalibrationOverlay</name>
+    <message>
+        <source>Screen-edge calibration marker %1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Drag %1 along this screen edge. Right-click to cancel calibration.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>On-screen calibration is unavailable on Wayland because exact desktop-edge window placement is not supported. Use manual dimensions instead.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>This window system does not support on-screen calibration.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>On-screen calibration currently requires exactly one display on each computer. Use manual dimensions for other layouts.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Screen calibration is already active.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>The screen-edge marker positions are invalid.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Close the other dialog on this computer before starting screen calibration.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>The display is too small to place calibration markers.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>The display layout or scaling changed. Start screen calibration again.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>The window manager moved a calibration marker away from the requested screen edge.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>The calibration markers could not be displayed. Use manual dimensions instead.</source>
         <translation type="unfinished"></translation>
     </message>
 </context>

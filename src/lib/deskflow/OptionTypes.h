@@ -60,6 +60,8 @@ static const OptionID kOptionClipboardSharingSize = OPTION_CODE("CLSZ");
 // Optional extension. Legacy clients ignore this option; clients must not send
 // DFSG until the server advertises version 1 of this capability.
 static const OptionID kOptionFullscreenGameGuard = OPTION_CODE("FGCP");
+// Bidirectional DCAL is permitted only after this advertisement and a client capability reply.
+static const OptionID kOptionAlignmentCalibration = OPTION_CODE("ALCP");
 //@}
 
 //! @name Computer switch corner masks

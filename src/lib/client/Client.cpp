@@ -14,6 +14,7 @@
 #include "client/ServerProxy.h"
 #include "client/ServerProxy1_7.h"
 #include "client/ServerProxy1_8.h"
+#include "common/AlignmentProtocol.h"
 #include "common/NetworkProtocol.h"
 #include "common/Settings.h"
 #include "deskflow/Clipboard.h"
@@ -24,12 +25,14 @@
 #include "deskflow/ProtocolTypes.h"
 #include "deskflow/ProtocolUtil.h"
 #include "deskflow/StreamChunker.h"
+#include "deskflow/ipc/AlignmentEvent.h"
 #include "deskflow/ipc/CoreIpc.h"
 #include "net/IDataSocket.h"
 #include "net/ISocketFactory.h"
 #include "net/SecureSocket.h"
 #include "net/TCPSocket.h"
 
+#include <QJsonArray>
 #include <QMetaEnum>
 
 #include <cstdlib>
@@ -70,11 +73,24 @@ Client::Client(
   m_events->addHandler(EventTypes::ComputerSuspend, getEventTarget(), [this](const auto &) { handleSuspend(); });
   m_events->addHandler(EventTypes::ComputerResume, getEventTarget(), [this](const auto &) { handleResume(); });
   m_gameGuardTimer = m_events->newTimer(0.1, nullptr);
-  m_events->addHandler(EventTypes::Timer, m_gameGuardTimer, [this](const auto &) { reportFullscreenGameGuard(); });
+  m_events->addHandler(EventTypes::Timer, m_gameGuardTimer, [this](const auto &) {
+    reportFullscreenGameGuard();
+    if (!m_alignmentSession.isEmpty() && std::chrono::steady_clock::now() >= m_alignmentExpires)
+      cancelLocalAlignment("timeout");
+  });
+  m_events->addHandler(EventTypes::AlignmentLocal, alignmentEventTarget(), [this](const auto &event) {
+    handleAlignmentLocal(event);
+  });
+  m_events->addEvent(Event(
+      EventTypes::AlignmentLocal, alignmentEventTarget(), new AlignmentEventData(AlignmentEventData::Kind::Initialize)
+  ));
 }
 
 Client::~Client()
 {
+  cancelLocalAlignment("disconnected", false);
+  m_events->removeHandler(EventTypes::AlignmentLocal, alignmentEventTarget());
+  ipcAlignmentCoreStopped();
   m_events->removeHandler(EventTypes::Timer, m_gameGuardTimer);
   m_events->deleteTimer(m_gameGuardTimer);
   m_events->removeHandler(EventTypes::ComputerSuspend, getEventTarget());
@@ -179,6 +195,7 @@ void Client::handshakeComplete()
   }
   sendEvent(EventTypes::ClientConnected);
   reportFullscreenGameGuard();
+  reportAlignmentCapability();
 }
 
 bool Client::isConnected() const
@@ -325,6 +342,9 @@ void Client::screensaver(bool activate)
 
 void Client::resetOptions()
 {
+  cancelLocalAlignment("options_changed");
+  m_alignmentProtocol = false;
+  m_alignmentReported = false;
   m_gameGuardProtocol = false;
   m_gameGuardReported = false;
   m_relativeMouseMoves = false;
@@ -342,7 +362,10 @@ void Client::setOptions(const OptionsList &options)
   for (size_t index = 0; index < options.size(); index += 2) {
     const OptionID id = options[index];
     const auto value = options[index + 1];
-    if (id == kOptionFullscreenGameGuard) {
+    if (id == kOptionAlignmentCalibration) {
+      m_alignmentProtocol = (value == 1);
+      m_alignmentReported = false;
+    } else if (id == kOptionFullscreenGameGuard) {
       m_gameGuardProtocol = (value == 1);
       m_gameGuardReported = false;
     } else if (id == kOptionClipboardSharing) {
@@ -367,6 +390,141 @@ void Client::setOptions(const OptionsList &options)
 
   m_computer->setOptions(options);
   reportFullscreenGameGuard();
+  reportAlignmentCapability();
+}
+
+void Client::reportAlignmentCapability()
+{
+  if (m_server && m_ready && m_alignmentProtocol && !m_alignmentReported) {
+    m_server->sendAlignmentMessage({{"type", "capability"}, {"version", 1}, {"uiReady", m_alignmentUiReady}});
+    m_alignmentReported = true;
+  }
+  publishAlignmentCapabilities();
+}
+
+void Client::publishAlignmentCapabilities()
+{
+  if (!m_alignmentUiReady)
+    return;
+  QJsonArray peers;
+  if (!m_alignmentServerName.isEmpty())
+    peers.append(
+        QJsonObject{
+            {"name", m_alignmentServerName},
+            {"protocol", m_alignmentProtocol ? 1 : 0},
+            {"uiReady", m_alignmentServerUiReady}
+        }
+    );
+  ipcSendAlignment(
+      {{"type", "capabilities"},
+       {"source", QString::fromStdString(m_name)},
+       {"role", "client"},
+       {"protocol", 1},
+       {"peers", peers}},
+      m_alignmentUiGeneration
+  );
+}
+
+void Client::cancelLocalAlignment(const QString &reason, bool notifyServer)
+{
+  if (!m_alignmentSession.isEmpty()) {
+    const auto name = QString::fromStdString(m_name);
+    if (notifyServer && m_server && m_ready && m_alignmentProtocol && !m_alignmentOwner.isEmpty())
+      m_server->sendAlignmentMessage(
+          {{"type", "cancel"},
+           {"session", m_alignmentSession},
+           {"source", name},
+           {"target", m_alignmentOwner},
+           {"reason", reason}}
+      );
+    ipcSendAlignment(
+        {{"type", "cancel"}, {"session", m_alignmentSession}, {"source", name}, {"target", name}, {"reason", reason}},
+        m_alignmentUiGeneration
+    );
+    m_alignmentSession.clear();
+    m_alignmentOwner.clear();
+  }
+}
+
+void Client::handleAlignmentLocal(const Event &event)
+{
+  const auto *data = dynamic_cast<AlignmentEventData *>(event.getDataObject());
+  if (!data)
+    return;
+  if (data->kind == AlignmentEventData::Kind::Initialize) {
+    ipcAlignmentCoreReady(QString::fromStdString(m_name), "client");
+    return;
+  }
+  if (data->kind == AlignmentEventData::Kind::UiAvailability) {
+    m_alignmentUiReady = data->available;
+    m_alignmentUiGeneration = data->generation;
+    if (!m_alignmentUiReady)
+      cancelLocalAlignment("ui_unavailable");
+    m_alignmentReported = false;
+    reportAlignmentCapability();
+    return;
+  }
+  if (!m_alignmentUiReady || data->generation != m_alignmentUiGeneration)
+    return;
+  auto message = data->message;
+  const auto name = QString::fromStdString(m_name);
+  message.insert("source", name);
+  if (!m_server || !m_ready || !m_alignmentProtocol) {
+    ipcSendAlignment(
+        deskflow::alignment::error(message, name, m_ready ? "unsupported" : "not_ready"), m_alignmentUiGeneration
+    );
+    return;
+  }
+  if (message.value("session").toString() != m_alignmentSession ||
+      message.value("target").toString() != m_alignmentOwner || message.value("type") == "show") {
+    ipcSendAlignment(deskflow::alignment::error(message, name, "invalid_session"), m_alignmentUiGeneration);
+    return;
+  }
+  m_server->sendAlignmentMessage(message);
+  if (message.value("type") == "close" || message.value("type") == "cancel" || message.value("type") == "error") {
+    m_alignmentSession.clear();
+    m_alignmentOwner.clear();
+  }
+}
+
+void Client::receiveAlignmentMessage(const QJsonObject &message)
+{
+  if (!m_alignmentProtocol)
+    return;
+  const auto type = message.value("type").toString();
+  if (type == "capability") {
+    m_alignmentServerName = message.value("source").toString();
+    m_alignmentServerUiReady = message.value("uiReady").toBool();
+    if (!m_alignmentServerUiReady)
+      cancelLocalAlignment("ui_unavailable");
+    publishAlignmentCapabilities();
+    return;
+  }
+  const auto name = QString::fromStdString(m_name);
+  if (message.value("target").toString().compare(name, Qt::CaseInsensitive) != 0)
+    return;
+  const auto session = message.value("session").toString();
+  const auto source = message.value("source").toString();
+  if (type == "show") {
+    if (!m_alignmentUiReady || (!m_alignmentSession.isEmpty() && m_alignmentSession != session)) {
+      auto failure = deskflow::alignment::error(message, name, m_alignmentUiReady ? "busy" : "ui_unavailable");
+      failure.insert("target", source);
+      if (m_server)
+        m_server->sendAlignmentMessage(failure);
+      return;
+    }
+    m_alignmentSession = session;
+    m_alignmentOwner = source;
+  } else if (session != m_alignmentSession || source != m_alignmentOwner) {
+    return;
+  }
+  m_alignmentExpires = std::chrono::steady_clock::now() + std::chrono::seconds(10);
+  if (m_alignmentUiReady)
+    ipcSendAlignment(message, m_alignmentUiGeneration);
+  if (type == "close" || type == "cancel") {
+    m_alignmentSession.clear();
+    m_alignmentOwner.clear();
+  }
 }
 
 void Client::reportFullscreenGameGuard()
@@ -561,6 +719,11 @@ void Client::cleanupConnection()
 
 void Client::cleanupComputer()
 {
+  cancelLocalAlignment("peer_disconnected", false);
+  m_alignmentProtocol = false;
+  m_alignmentReported = false;
+  m_alignmentServerUiReady = false;
+  m_alignmentServerName.clear();
   m_gameGuardProtocol = false;
   m_gameGuardReported = false;
   m_gameGuardSequence = 0;

@@ -8,6 +8,7 @@
 
 #include "IpcClient.h"
 
+#include <QJsonObject>
 #include <QObject>
 
 namespace deskflow::gui::ipc {
@@ -20,12 +21,20 @@ public:
   explicit CoreIpcClient(QObject *parent = nullptr);
 
   void sendStop();
+  void registerAlignmentUi();
+  void sendAlignmentMessage(const QJsonObject &message);
 
 Q_SIGNALS:
   void commandReceived(const QString &command, const QString &args);
+  void alignmentRegistered();
+  void alignmentMessageReceived(const QJsonObject &message);
 
 protected:
   void processCommand(const QString &command, const QStringList &parts) override;
+
+private:
+  bool m_alignmentRegistered = false;
+  QString m_alignmentLocalName;
 };
 
 } // namespace deskflow::gui::ipc

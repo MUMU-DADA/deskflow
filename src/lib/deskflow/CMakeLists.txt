@@ -80,6 +80,7 @@ add_library(${lib_name} STATIC ${PLATFORM_CODE}
   KeyboardLayoutManager.cpp
   KeyboardLayoutManager.h
   ipc/IpcServer.cpp
+  ipc/AlignmentEvent.h
   ipc/IpcServer.h
   ipc/DaemonIpcServer.cpp
   ipc/DaemonIpcServer.h

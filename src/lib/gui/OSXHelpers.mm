@@ -15,6 +15,8 @@
 #import <UserNotifications/UNUserNotificationCenter.h>
 #import <objc/runtime.h>
 
+#include <QGuiApplication>
+#include <QWidget>
 #import <QtGlobal>
 
 #pragma clang diagnostic push
@@ -113,6 +115,25 @@ void macOSNativeHide()
 {
   [NSApp hide:nil];
   [[NSApplication sharedApplication] setActivationPolicy:NSApplicationActivationPolicyAccessory];
+}
+
+bool raiseOSXScreenCalibrationMarker(QWidget *marker)
+{
+  if (![NSThread isMainThread] || QGuiApplication::platformName() != "cocoa" || !marker || !marker->isWindow() ||
+      !marker->isVisible())
+    return false;
+
+  @autoreleasepool {
+    // QWidget::winId() is the native NSView on Cocoa. Qt 6.9's stay-on-top
+    // hint uses the modal-panel level, which remains below the menu bar/Dock.
+    // Only these small, temporary markers need the status-window level.
+    NSView *view = reinterpret_cast<NSView *>(marker->winId());
+    NSWindow *window = view.window;
+    if (!window)
+      return false;
+    window.level = NSStatusWindowLevel;
+    return window.level == NSStatusWindowLevel;
+  }
 }
 
 static NSApplicationTerminateReply deskflow_applicationShouldTerminate(id self, SEL _cmd, NSApplication *sender)

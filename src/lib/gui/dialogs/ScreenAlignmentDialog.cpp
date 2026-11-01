@@ -6,6 +6,8 @@
 #include "ScreenAlignmentDialog.h"
 
 #include "gui/config/ServerConfig.h"
+#include "gui/core/ScreenCalibrationController.h"
+#include "gui/dialogs/ScreenCalibrationDialog.h"
 #include "gui/widgets/ScreenAlignmentPreview.h"
 
 #include <QCheckBox>
@@ -31,6 +33,8 @@ constexpr double maximumSizeMm = 100000;
 
 bool editable(const ScreenAlignment &alignment)
 {
+  if (alignment.calibration)
+    return alignment.isValid();
   const auto dimension = [](double value) {
     return std::isfinite(value) && value >= minimumSizeMm && value <= maximumSizeMm;
   };
@@ -48,9 +52,13 @@ QLabel *description(const QString &text, QWidget *parent)
 }
 } // namespace
 
-ScreenAlignmentDialog::ScreenAlignmentDialog(QWidget *parent, ServerConfig &config, const QString &preferredComputer)
+ScreenAlignmentDialog::ScreenAlignmentDialog(
+    QWidget *parent, ServerConfig &config, const QString &preferredComputer,
+    ScreenCalibrationController *calibrationController
+)
     : QDialog(parent),
-      m_config(config)
+      m_config(config),
+      m_calibrationController(calibrationController)
 {
   setObjectName("screenAlignmentDialog");
   setWindowTitle(tr("Screen alignment"));
@@ -90,6 +98,19 @@ ScreenAlignmentDialog::ScreenAlignmentDialog(QWidget *parent, ServerConfig &conf
          "Individual monitors within a computer are not arranged here."),
       body
   ));
+  auto *methods = new QHBoxLayout;
+  m_calibrate = new QPushButton(tr("Calibrate on the actual screens…"), body);
+  m_calibrate->setObjectName("calibrateScreenEdges");
+  m_calibrate->setToolTip(tr("Match blue A and orange B markers across the two real screen edges. No ruler is needed.")
+  );
+  m_manual = new QPushButton(tr("Use manual dimensions"), body);
+  m_manual->setObjectName("useManualDimensions");
+  methods->addWidget(m_calibrate, 1);
+  methods->addWidget(m_manual);
+  bodyLayout->addLayout(methods);
+  m_calibrationSummary = description({}, body);
+  m_calibrationSummary->setObjectName("calibrationSummary");
+  bodyLayout->addWidget(m_calibrationSummary);
   m_preview = new ScreenAlignmentPreview(body);
   m_preview->setMinimumHeight(200);
   bodyLayout->addWidget(m_preview, 1);
@@ -227,6 +248,10 @@ ScreenAlignmentDialog::ScreenAlignmentDialog(QWidget *parent, ServerConfig &conf
   for (auto *spin : {m_firstWidth, m_firstHeight, m_secondWidth, m_secondHeight, m_offset})
     connect(spin, &QDoubleSpinBox::valueChanged, this, &ScreenAlignmentDialog::controlsChanged);
   connect(m_preview, &ScreenAlignmentPreview::offsetEdited, m_offset, &QDoubleSpinBox::setValue);
+  connect(m_calibrate, &QPushButton::clicked, this, &ScreenAlignmentDialog::calibrateEdges);
+  connect(m_manual, &QPushButton::clicked, this, &ScreenAlignmentDialog::useManualDimensions);
+  if (m_calibrationController)
+    connect(m_calibrationController, &ScreenCalibrationController::stateChanged, this, [this] { updateFeedback(); });
   connect(m_alignStart, &QPushButton::clicked, this, [this] { alignScreens(0); });
   connect(center, &QPushButton::clicked, this, [this] { alignScreens(1); });
   connect(m_alignEnd, &QPushButton::clicked, this, [this] { alignScreens(2); });
@@ -262,6 +287,8 @@ void ScreenAlignmentDialog::selectPair(int index)
     m_geometry->setEnabled(false);
     m_preview->setEnabled(false);
     m_reset->setEnabled(false);
+    m_calibrate->setEnabled(false);
+    m_manual->setVisible(false);
     m_status->setText(tr("Place two computers next to each other in the layout to align their screens."));
     m_buttons->button(QDialogButtonBox::Save)->setEnabled(false);
     m_loading = false;
@@ -344,6 +371,26 @@ void ScreenAlignmentDialog::updateFeedback()
   const auto &draft = m_drafts[m_current];
   const bool active = draft.enabled && !m_unsupported[m_current];
   m_geometry->setEnabled(active);
+  m_geometry->setVisible(!draft.calibration);
+  m_calibrate->setEnabled(
+      m_calibrationController && m_calibrationController->isAvailable() && !m_calibrationController->isActive()
+  );
+  m_manual->setVisible(draft.calibration.has_value());
+  m_manual->setEnabled(!m_unsupported[m_current]);
+  if (draft.calibration) {
+    const auto transform = draft.calibration->transform();
+    m_calibrationSummary->setText(
+        transform
+            ? tr("Calibrated from edge markers. Relative edge length 1 : %1; offset %2% of the first edge. The preview "
+                 "shows proportions, not millimeters.")
+                  .arg(QString::number(transform->ratio, 'g', 5), QString::number(100 * transform->offset, 'f', 2))
+            : QString()
+    );
+  } else {
+    m_calibrationSummary->setText(
+        tr("Drag matching colored markers on the actual screens, or enter the measurements below.")
+    );
+  }
   m_preview->setEnabled(active);
   m_preview->setAlignment(draft);
   m_buttons->button(QDialogButtonBox::Save)->setEnabled(canSave());
@@ -430,6 +477,32 @@ void ScreenAlignmentDialog::swapDimensions(bool second)
     draft.firstSizeMm.transpose();
     m_firstHints[m_current] = tr("Manual dimensions.");
   }
+  selectPair(m_current);
+}
+
+void ScreenAlignmentDialog::calibrateEdges()
+{
+  if (!m_calibrationController || m_current < 0)
+    return;
+  ScreenCalibrationDialog dialog(this, *m_calibrationController, m_drafts[m_current]);
+  if (dialog.exec() != QDialog::Accepted || !dialog.calibration())
+    return;
+  auto &draft = m_drafts[m_current];
+  draft.calibration = dialog.calibration();
+  draft.enabled = true;
+  m_unsupported[m_current] = false;
+  selectPair(m_current);
+}
+
+void ScreenAlignmentDialog::useManualDimensions()
+{
+  if (m_current < 0)
+    return;
+  m_drafts[m_current] = initialAlignment(m_drafts[m_current].pair());
+  m_drafts[m_current].enabled = true;
+  m_unsupported[m_current] = false;
+  m_firstHints[m_current] = tr("Editable starting dimensions.");
+  m_secondHints[m_current] = tr("Editable starting dimensions.");
   selectPair(m_current);
 }
 

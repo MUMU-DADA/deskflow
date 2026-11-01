@@ -40,6 +40,7 @@ Q_SIGNALS:
   void connectionFailed();
   void serverShutdown();
   void versionMismatch();
+  void disconnected();
 
 private Q_SLOTS:
   void handleDisconnected();

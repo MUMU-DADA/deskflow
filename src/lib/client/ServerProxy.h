@@ -12,6 +12,7 @@
 #include "deskflow/ClipboardChunk.h"
 #include "deskflow/ClipboardTypes.h"
 #include "deskflow/KeyTypes.h"
+#include <QJsonObject>
 
 class Client;
 class ClientInfo;
@@ -49,6 +50,7 @@ public:
 
   void onInfoChanged();
   void onFullscreenGameGuardChanged(uint32_t sequence, bool guarded);
+  void sendAlignmentMessage(const QJsonObject &message);
   bool onGrabClipboard(ClipboardID);
   void onClipboardChanged(ClipboardID, const IClipboard *);
 

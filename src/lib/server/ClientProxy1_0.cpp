@@ -7,6 +7,8 @@
  */
 
 #include "server/ClientProxy1_0.h"
+#include "common/AlignmentProtocol.h"
+#include "deskflow/ipc/AlignmentEvent.h"
 
 #include "base/IEventQueue.h"
 #include "base/Log.h"
@@ -165,7 +167,9 @@ bool ClientProxy1_0::parseHandshakeMessage(const uint8_t *code)
 
 bool ClientProxy1_0::parseMessage(const uint8_t *code)
 {
-  if (memcmp(code, kMsgDFullscreenGameGuard, 4) == 0) {
+  if (memcmp(code, kMsgDAlignment, 4) == 0) {
+    return recvAlignment();
+  } else if (memcmp(code, kMsgDFullscreenGameGuard, 4) == 0) {
     return recvFullscreenGameGuard();
   } else if (memcmp(code, kMsgDInfo, 4) == 0) {
     if (recvInfo()) {
@@ -348,6 +352,9 @@ void ClientProxy1_0::screensaver(bool on)
 
 void ClientProxy1_0::resetOptions()
 {
+  m_alignmentAdvertised = false;
+  m_alignmentCapable = false;
+  m_alignmentUiReady = false;
   m_gameGuardAdvertised = false;
   m_gameGuardCapable = false;
   m_gameGuardKnown = false;
@@ -373,7 +380,9 @@ void ClientProxy1_0::setOptions(const OptionsList &options)
 
   // check options
   for (uint32_t i = 0, n = (uint32_t)options.size(); i < n; i += 2) {
-    if (options[i] == kOptionFullscreenGameGuard) {
+    if (options[i] == kOptionAlignmentCalibration) {
+      m_alignmentAdvertised = (options[i + 1] == 1);
+    } else if (options[i] == kOptionFullscreenGameGuard) {
       m_gameGuardAdvertised = (options[i + 1] == 1);
     } else if (options[i] == kOptionHeartbeat) {
       double rate = 1.0e-3 * static_cast<double>(options[i + 1]);
@@ -385,6 +394,41 @@ void ClientProxy1_0::setOptions(const OptionsList &options)
       addHeartbeatTimer();
     }
   }
+}
+
+bool ClientProxy1_0::sendAlignmentMessage(const QJsonObject &message)
+{
+  if (!alignmentCapable())
+    return false;
+  const auto data = deskflow::alignment::encode(message, true);
+  if (data.isEmpty())
+    return false;
+  const std::string bytes(data.constData(), data.size());
+  ProtocolUtil::writef(getStream(), kMsgDAlignment, &bytes);
+  return true;
+}
+
+bool ClientProxy1_0::recvAlignment()
+{
+  if (!m_alignmentAdvertised)
+    throw BadClientException("Unnegotiated calibration packet");
+  std::string bytes;
+  if (!ProtocolUtil::readStringWithLimit(getStream(), bytes, deskflow::alignment::maxMessageBytes))
+    throw BadClientException("Incomplete calibration packet");
+  auto message = deskflow::alignment::decode(QByteArray::fromStdString(bytes), true);
+  if (!message)
+    return true; // Bounded but invalid calibration data must not interrupt ordinary input.
+  if (message->value("type") == "capability") {
+    m_alignmentCapable = true;
+    m_alignmentUiReady = message->value("uiReady").toBool();
+  } else if (!m_alignmentCapable) {
+    return true;
+  }
+  message->insert("source", QString::fromStdString(getName()));
+  m_events->addEvent(Event(
+      EventTypes::AlignmentPeer, getEventTarget(), new AlignmentEventData(AlignmentEventData::Kind::Message, *message)
+  ));
+  return true;
 }
 
 bool ClientProxy1_0::isForegroundGameGuarded() const

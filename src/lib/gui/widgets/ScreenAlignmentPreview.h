@@ -42,6 +42,7 @@ private:
   void finishDrag();
 
   ScreenAlignment m_alignment;
+  std::optional<ScreenAlignmentVisualGeometry> m_visual;
   QPointF m_origin;
   QRectF m_firstRect;
   QRectF m_secondRect;

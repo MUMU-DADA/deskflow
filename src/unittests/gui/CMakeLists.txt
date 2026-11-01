@@ -21,3 +21,23 @@ set_target_properties(ScreenAlignmentDialogTests PROPERTIES
   RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/alignment-dialog"
 )
 target_include_directories(ScreenAlignmentDialogTests PRIVATE "${CMAKE_SOURCE_DIR}/src/lib/gui")
+
+create_test(
+  NAME ScreenCalibrationOverlayTests
+  DEPENDS gui
+  SOURCE ScreenCalibrationOverlayTests.cpp
+  WORKING_DIRECTORY "${CMAKE_BINARY_DIR}/src/lib/gui"
+)
+set_target_properties(ScreenCalibrationOverlayTests PROPERTIES
+  RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/calibration-overlay"
+)
+
+create_test(
+  NAME ScreenCalibrationTests
+  DEPENDS gui
+  SOURCE ScreenCalibrationTests.cpp
+  WORKING_DIRECTORY "${CMAKE_BINARY_DIR}/src/lib/gui"
+)
+set_target_properties(ScreenCalibrationTests PROPERTIES
+  RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/calibration-dialog"
+)

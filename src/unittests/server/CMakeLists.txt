@@ -28,3 +28,14 @@ create_test(
   SOURCE ClientProxyTests.cpp
   WORKING_DIRECTORY "${CMAKE_BINARY_DIR}/src/lib/server"
 )
+
+create_test(
+  NAME AlignmentTransportTests
+  DEPENDS server
+  LIBS base arch io mt net platform app common Qt6::Network ${extra_libs}
+  SOURCE AlignmentTransportTests.cpp
+  WORKING_DIRECTORY "${CMAKE_BINARY_DIR}/src/lib/server"
+)
+set_target_properties(AlignmentTransportTests PROPERTIES
+  RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/alignment-transport"
+)

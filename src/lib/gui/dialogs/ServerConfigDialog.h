@@ -15,6 +15,7 @@
 #include <QDialog>
 
 class SettingsDialogButtonBox;
+class ScreenCalibrationController;
 class QItemSelection;
 
 namespace Ui {
@@ -26,7 +27,9 @@ class ServerConfigDialog : public QDialog
   Q_OBJECT
 
 public:
-  ServerConfigDialog(QWidget *parent, ServerConfig &config);
+  ServerConfigDialog(
+      QWidget *parent, ServerConfig &config, ScreenCalibrationController *calibrationController = nullptr
+  );
   ~ServerConfigDialog() override;
   bool addClient(const QString &clientName);
   void message(const QString &message)
@@ -123,4 +126,5 @@ private:
   ServerConfig m_serverConfig;
   ComputerSetupModel m_computerSetupModel;
   SettingsDialogButtonBox *m_buttonBox = nullptr;
+  ScreenCalibrationController *m_calibrationController = nullptr;
 };

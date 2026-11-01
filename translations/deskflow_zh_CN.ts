@@ -1070,6 +1070,26 @@ Green sections allow crossing; the remaining edge is blocked.</source>
         <source>Close Screen alignment and reopen it for the current layout.</source>
         <translation>请关闭并重新打开“屏幕对齐”，以使用当前布局。</translation>
     </message>
+    <message>
+        <source>Calibrate on the actual screens…</source>
+        <translation>在实际屏幕上校准…</translation>
+    </message>
+    <message>
+        <source>Match blue A and orange B markers across the two real screen edges. No ruler is needed.</source>
+        <translation>将两屏边缘的蓝色 A 和橙色 B 标记分别对齐，无需尺子。</translation>
+    </message>
+    <message>
+        <source>Use manual dimensions</source>
+        <translation>改用手填尺寸</translation>
+    </message>
+    <message>
+        <source>Calibrated from edge markers. Relative edge length 1 : %1; offset %2% of the first edge. The preview shows proportions, not millimeters.</source>
+        <translation>已用边缘标记校准。相对边长为 1 : %1，偏移为第一块屏幕边长的 %2%。预览表示比例，不表示实际毫米数。</translation>
+    </message>
+    <message>
+        <source>Drag matching colored markers on the actual screens, or enter the measurements below.</source>
+        <translation>在实际屏幕上拖动同色标记进行校准，也可以在下方手填尺寸。</translation>
+    </message>
 </context>
 <context>
     <name>ScreenAlignmentPreview</name>
@@ -1092,6 +1112,257 @@ Green sections allow crossing; the remaining edge is blocked.</source>
     <message>
         <source>%1 × %2 mm</source>
         <translation>%1 × %2 毫米</translation>
+    </message>
+    <message>
+        <source>This preview shows relative proportions. Recalibrate on the real screens to change the alignment.</source>
+        <translation>此预览显示相对比例。请在实际屏幕上重新校准来调整对齐。</translation>
+    </message>
+    <message>
+        <source>Relative scale</source>
+        <translation>相对比例</translation>
+    </message>
+    <message>
+        <source>Adjust the screen-edge points to preview the alignment.</source>
+        <translation>调整屏幕边缘标记以预览对齐结果。</translation>
+    </message>
+</context>
+<context>
+    <name>ScreenCalibrationController</name>
+    <message>
+        <source>The other computer did not show its markers. Check that both computers run the updated Deskflow GUI.</source>
+        <translation>另一台电脑未显示标记。请确认两端都在运行新版 Deskflow 界面。</translation>
+    </message>
+    <message>
+        <source>Calibration timed out. Start it again when you are ready.</source>
+        <translation>校准已超时，准备好后可以重新开始。</translation>
+    </message>
+    <message>
+        <source>Another screen calibration is already running.</source>
+        <translation>已有其他屏幕校准正在进行。</translation>
+    </message>
+    <message>
+        <source>Start Deskflow and connect both computers before calibrating their edges.</source>
+        <translation>请先启动 Deskflow 并连接两台电脑，再进行边缘校准。</translation>
+    </message>
+    <message>
+        <source>The Deskflow connection was interrupted. Your previous alignment has been kept.</source>
+        <translation>Deskflow 连接已中断，原来的对齐设置已保留。</translation>
+    </message>
+    <message>
+        <source>Calibration is not running.</source>
+        <translation>尚未开始校准。</translation>
+    </message>
+    <message>
+        <source>Waiting for both computers to display their edge markers…</source>
+        <translation>正在等待两台电脑显示边缘标记…</translation>
+    </message>
+    <message>
+        <source>Move A and B farther apart on both screens (at least 10% of each edge).</source>
+        <translation>请将两屏上的 A、B 标记拉开一些，间距至少为各自边长的 10%。</translation>
+    </message>
+    <message>
+        <source>Keep A and B in the same order on both screens.</source>
+        <translation>两块屏幕上的 A、B 标记应保持相同顺序。</translation>
+    </message>
+    <message>
+        <source>The third point does not match. Recheck A, B and C before using this calibration.</source>
+        <translation>第三点存在偏差，请重新检查 A、B、C 的对齐后再使用此校准。</translation>
+    </message>
+    <message>
+        <source>These marker positions cannot produce a usable alignment.</source>
+        <translation>当前标记位置无法计算出可用的对齐结果。</translation>
+    </message>
+    <message>
+        <source>Align each matching color in the real world, then choose Use calibration.</source>
+        <translation>请目视将两屏上的同色标记分别对齐，然后点击“使用此校准”。</translation>
+    </message>
+    <message>
+        <source>Relative edge length: %1 : %2
+Second-screen offset: %3% of the first edge. No millimeter measurement is required.</source>
+        <translation>相对边长：%1 : %2
+第二块屏幕偏移：第一块屏幕边长的 %3%。无需测量毫米尺寸。</translation>
+    </message>
+    <message>
+        <source>Third-point discrepancy: %1% of the first edge.</source>
+        <translation>第三点偏差：第一块屏幕边长的 %1%。</translation>
+    </message>
+    <message>
+        <source>The display geometry changed or is unsupported. Restart calibration on a single display per computer.</source>
+        <translation>显示布局已改变或不受支持。请在每台电脑各接一块屏幕的布局下重新校准。</translation>
+    </message>
+    <message>
+        <source>Update Deskflow on both computers to use on-screen edge markers. Manual alignment remains available.</source>
+        <translation>使用实屏边缘标记需要更新两端 Deskflow。仍可使用手填尺寸对齐。</translation>
+    </message>
+    <message>
+        <source>Open the updated Deskflow GUI on both computers, connect them, then try again.</source>
+        <translation>请打开两台电脑上的新版 Deskflow 界面，连接成功后重试。</translation>
+    </message>
+    <message>
+        <source>The other computer has an open dialog or calibration. Close it and try again.</source>
+        <translation>另一台电脑有正在打开的对话框或校准，请关闭后重试。</translation>
+    </message>
+    <message>
+        <source>Calibration was cancelled. Your previous alignment has been kept.</source>
+        <translation>校准已取消，原来的对齐设置已保留。</translation>
+    </message>
+    <message>
+        <source>This Wayland session cannot position edge markers precisely. Use manual screen alignment here.</source>
+        <translation>当前 Wayland 会话无法精确定位边缘标记，请使用手填尺寸对齐。</translation>
+    </message>
+    <message>
+        <source>Edge markers currently require one display per computer. Display changes cancel calibration.</source>
+        <translation>边缘标记目前要求每台电脑各接一块屏幕。显示设置改变时会取消校准。</translation>
+    </message>
+    <message>
+        <source>Calibration stopped because a computer or its display is no longer available. Your previous alignment has been kept.</source>
+        <translation>电脑或显示器已不可用，校准停止。原来的对齐设置已保留。</translation>
+    </message>
+</context>
+<context>
+    <name>ScreenCalibrationDialog</name>
+    <message>
+        <source>Align the colored markers</source>
+        <translation>对齐实屏彩色标记</translation>
+    </message>
+    <message>
+        <source>Look at the markers on the real displays. Drag the blue A markers until they line up across the seam, then align the orange B markers. Keep the two colors well apart on each display.</source>
+        <translation>观察实际屏幕上的标记。先拖动蓝色 A，使两屏的箭头尖端在接缝两侧对齐，再对齐橙色 B。每块屏幕上的两种颜色应保持足够间距。</translation>
+    </message>
+    <message>
+        <source>A — blue</source>
+        <translation>A：蓝色</translation>
+    </message>
+    <message>
+        <source>B — orange</source>
+        <translation>B：橙色</translation>
+    </message>
+    <message>
+        <source>Use the matching letters as well as the colors. Two matched positions determine the relative edge size and offset; no ruler or millimeter measurements are needed.</source>
+        <translation>可同时根据字母和颜色配对。两组位置就能确定相对边长和偏移，无需尺子或手填毫米尺寸。</translation>
+    </message>
+    <message>
+        <source>The preview will appear when both displays are ready.</source>
+        <translation>两块屏幕准备好后将显示预览。</translation>
+    </message>
+    <message>
+        <source>Check the alignment with a third green C marker</source>
+        <translation>增加绿色 C 标记，检查对齐误差</translation>
+    </message>
+    <message>
+        <source>The optional C markers check the remaining error. They do not change the calibration from A and B.</source>
+        <translation>可选的 C 标记用于检查剩余误差，不会改变由 A、B 算出的校准结果。</translation>
+    </message>
+    <message>
+        <source>Use calibration returns this result to Screen alignment. Save there and in Server Configuration to apply it.</source>
+        <translation>点击“使用此校准”将结果带回“屏幕对齐”。还需保存“屏幕对齐”和“服务器配置”两个窗口才会生效。</translation>
+    </message>
+    <message>
+        <source>Use calibration</source>
+        <translation>使用此校准</translation>
+    </message>
+    <message>
+        <source>Retry</source>
+        <translation>重试</translation>
+    </message>
+    <message>
+        <source>The calibration connection is no longer available.</source>
+        <translation>校准连接已不可用。</translation>
+    </message>
+    <message>
+        <source>Calibration could not start. Check that both computers are connected, then retry.</source>
+        <translation>无法开始校准，请确认两台电脑已连接后重试。</translation>
+    </message>
+    <message>
+        <source>%1: stopped</source>
+        <translation>%1：已停止</translation>
+    </message>
+    <message>
+        <source>%1: ready</source>
+        <translation>%1：已就绪</translation>
+    </message>
+    <message>
+        <source>%1: waiting for markers…</source>
+        <translation>%1：等待标记…</translation>
+    </message>
+    <message>
+        <source>Preview shows the last valid alignment. Adjust the markers or retry to continue.</source>
+        <translation>预览显示上一次有效结果，请调整标记或重试后继续。</translation>
+    </message>
+    <message>
+        <source>The preview will appear when both displays have valid marker positions.</source>
+        <translation>两块屏幕的标记位置有效后将显示预览。</translation>
+    </message>
+    <message>
+        <source>No valid measurement yet.</source>
+        <translation>尚无有效的校准结果。</translation>
+    </message>
+    <message>
+        <source>Waiting for both displays to show the markers.</source>
+        <translation>等待两块屏幕显示标记。</translation>
+    </message>
+    <message>
+        <source>The displayed preview is the last valid result; it cannot be used yet.</source>
+        <translation>当前预览是上一次有效结果，暂时不能使用。</translation>
+    </message>
+    <message>
+        <source>Calibration stopped. Retry when both computers are ready.</source>
+        <translation>校准已停止，两台电脑准备好后可重试。</translation>
+    </message>
+    <message>
+        <source>Another screen calibration is already running.</source>
+        <translation>已有其他屏幕校准正在进行。</translation>
+    </message>
+</context>
+<context>
+    <name>ScreenCalibrationOverlay</name>
+    <message>
+        <source>Screen-edge calibration marker %1</source>
+        <translation>屏幕边缘校准标记 %1</translation>
+    </message>
+    <message>
+        <source>Drag %1 along this screen edge. Right-click to cancel calibration.</source>
+        <translation>沿屏幕边缘拖动 %1。右键单击可取消校准。</translation>
+    </message>
+    <message>
+        <source>On-screen calibration is unavailable on Wayland because exact desktop-edge window placement is not supported. Use manual dimensions instead.</source>
+        <translation>Wayland 不支持精确定位屏幕边缘标记，当前无法使用实屏校准。请改用手填尺寸。</translation>
+    </message>
+    <message>
+        <source>This window system does not support on-screen calibration.</source>
+        <translation>当前窗口系统不支持实屏校准。</translation>
+    </message>
+    <message>
+        <source>On-screen calibration currently requires exactly one display on each computer. Use manual dimensions for other layouts.</source>
+        <translation>实屏校准目前要求每台电脑各接一块屏幕，其他布局请使用手填尺寸。</translation>
+    </message>
+    <message>
+        <source>Screen calibration is already active.</source>
+        <translation>屏幕校准已在进行中。</translation>
+    </message>
+    <message>
+        <source>The screen-edge marker positions are invalid.</source>
+        <translation>屏幕边缘标记位置无效。</translation>
+    </message>
+    <message>
+        <source>Close the other dialog on this computer before starting screen calibration.</source>
+        <translation>请先关闭这台电脑上的其他对话框，再开始屏幕校准。</translation>
+    </message>
+    <message>
+        <source>The display is too small to place calibration markers.</source>
+        <translation>屏幕太小，无法放置校准标记。</translation>
+    </message>
+    <message>
+        <source>The display layout or scaling changed. Start screen calibration again.</source>
+        <translation>显示布局或缩放已改变，请重新开始校准。</translation>
+    </message>
+    <message>
+        <source>The window manager moved a calibration marker away from the requested screen edge.</source>
+        <translation>窗口管理器移动了标记，无法确保它位于指定屏幕边缘。</translation>
+    </message>
+    <message>
+        <source>The calibration markers could not be displayed. Use manual dimensions instead.</source>
+        <translation>无法显示校准标记，请改用手填尺寸。</translation>
     </message>
 </context>
 <context>

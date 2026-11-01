@@ -35,6 +35,15 @@ public:
   void getShape(int32_t &x, int32_t &y, int32_t &width, int32_t &height) const override;
   void getCursorPos(int32_t &x, int32_t &y) const override;
   bool isForegroundGameGuarded() const override;
+  bool alignmentCapable() const override
+  {
+    return m_alignmentCapable && m_alignmentAdvertised;
+  }
+  bool alignmentUiReady() const override
+  {
+    return alignmentCapable() && m_alignmentUiReady;
+  }
+  bool sendAlignmentMessage(const QJsonObject &message) override;
 
   // IClient overrides
   void enter(int32_t xAbs, int32_t yAbs, uint32_t seqNum, KeyModifierMask mask, bool forScreensaver) override;
@@ -81,6 +90,7 @@ private:
   bool recvInfo();
   bool recvGrabClipboard();
   bool recvFullscreenGameGuard();
+  bool recvAlignment();
 
 protected:
   struct ClientClipboard
@@ -102,6 +112,9 @@ private:
   ClientInfo m_info;
   // This state belongs to this connection, never to a reusable computer name.
   bool m_gameGuardAdvertised = false;
+  bool m_alignmentAdvertised = false;
+  bool m_alignmentCapable = false;
+  bool m_alignmentUiReady = false;
   bool m_gameGuardCapable = false;
   bool m_gameGuardActive = false;
   bool m_gameGuardKnown = false;

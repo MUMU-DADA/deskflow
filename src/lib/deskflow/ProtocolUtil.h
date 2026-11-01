@@ -12,6 +12,7 @@
 
 #include <cstdint>
 #include <stdarg.h>
+#include <string>
 #include <vector>
 
 namespace deskflow {
@@ -63,6 +64,8 @@ public:
   - \%s   -- reads bytes;  argument must be a std::string*, \b not a char*
   */
   static bool readf(deskflow::IStream *, const char *fmt, ...);
+  // Reads a %s payload, checking the wire length before allocating its buffer.
+  static bool readStringWithLimit(deskflow::IStream *, std::string &value, uint32_t maximum);
 
 private:
   static void vwritef(deskflow::IStream *, const char *fmt, uint32_t size, va_list);

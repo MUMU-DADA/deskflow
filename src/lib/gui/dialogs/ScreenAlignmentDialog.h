@@ -18,6 +18,7 @@ class QGroupBox;
 class QLabel;
 class QPushButton;
 class ScreenAlignmentPreview;
+class ScreenCalibrationController;
 class ServerConfig;
 
 class ScreenAlignmentDialog : public QDialog
@@ -25,7 +26,10 @@ class ScreenAlignmentDialog : public QDialog
   Q_OBJECT
 
 public:
-  explicit ScreenAlignmentDialog(QWidget *parent, ServerConfig &config, const QString &preferredComputer = {});
+  explicit ScreenAlignmentDialog(
+      QWidget *parent, ServerConfig &config, const QString &preferredComputer = {},
+      ScreenCalibrationController *calibrationController = nullptr
+  );
 
 public Q_SLOTS:
   void accept() override;
@@ -38,9 +42,12 @@ private:
   void resetAlignment();
   void alignScreens(int alignment);
   void swapDimensions(bool second);
+  void calibrateEdges();
+  void useManualDimensions();
   bool canSave() const;
 
   ServerConfig &m_config;
+  ScreenCalibrationController *m_calibrationController = nullptr;
   QList<ScreenAlignment> m_drafts;
   QList<bool> m_unsupported;
   QList<QString> m_firstHints;
@@ -50,6 +57,9 @@ private:
 
   QComboBox *m_pair = nullptr;
   QCheckBox *m_enabled = nullptr;
+  QPushButton *m_calibrate = nullptr;
+  QPushButton *m_manual = nullptr;
+  QLabel *m_calibrationSummary = nullptr;
   ScreenAlignmentPreview *m_preview = nullptr;
   QWidget *m_geometry = nullptr;
   QGroupBox *m_firstGroup = nullptr;

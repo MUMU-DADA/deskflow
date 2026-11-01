@@ -15,7 +15,9 @@
 #include "deskflow/ClipboardTypes.h"
 #include "deskflow/KeyTypes.h"
 #include "deskflow/MouseTypes.h"
+#include "server/AlignmentSession.h"
 #include "server/Config.h"
+#include <QJsonObject>
 
 #include <climits>
 #include <map>
@@ -299,6 +301,12 @@ private:
 
   // send computer options to \c client
   void sendOptions(BaseClientProxy *client) const;
+  void handleAlignmentLocal(const Event &event);
+  void handleAlignmentPeer(BaseClientProxy *client, const Event &event);
+  void routeAlignmentMessage(const QString &source, QJsonObject message, bool fromLocalUi);
+  void publishAlignmentCapabilities();
+  void cancelAlignment(const QString &reason);
+  bool deliverAlignment(const QString &target, const QJsonObject &message);
 
   // process options from configuration
   void processOptions();
@@ -394,6 +402,9 @@ private:
   double m_switchWaitDelay = 0.0;
   EventQueueTimer *m_switchWaitTimer = nullptr;
   EventQueueTimer *m_gameGuardTimer = nullptr;
+  AlignmentSession m_alignmentSession;
+  bool m_alignmentUiReady = false;
+  uint64_t m_alignmentUiGeneration = 0;
   bool m_primaryGameGuarded = false;
   BaseClientProxy *m_relativeGameGuardClient = nullptr;
 

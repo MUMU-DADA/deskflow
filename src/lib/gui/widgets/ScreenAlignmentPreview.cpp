@@ -58,20 +58,26 @@ QRectF ScreenAlignmentPreview::secondScreenRect() const
 
 double ScreenAlignmentPreview::pixelsPerMm() const
 {
-  return m_scale;
+  return m_visual && m_visual->relative ? 0 : m_scale;
 }
 
 void ScreenAlignmentPreview::setAlignment(const ScreenAlignment &alignment)
 {
   const bool newPair = m_alignment.pair() != alignment.pair();
-  if (newPair || !alignment.enabled)
+  if (newPair || !alignment.enabled || alignment.calibration)
     finishDrag();
   m_alignment = alignment;
+  m_visual = alignment.visualGeometry();
   setToolTip(
-      alignment.orientation == Qt::Horizontal
+      alignment.calibration
+          ? tr("This preview shows relative proportions. Recalibrate on the real screens to change the alignment.")
+      : alignment.orientation == Qt::Horizontal
           ? tr("Drag the second screen up or down. Arrow keys move it by 1 mm; Shift moves it by 10 mm.")
           : tr("Drag the second screen left or right. Arrow keys move it by 1 mm; Shift moves it by 10 mm.")
   );
+  if (alignment.calibration)
+    unsetCursor();
+  setFocusPolicy(alignment.calibration ? Qt::NoFocus : Qt::StrongFocus);
   // Freeze both scale and origin throughout a drag. Otherwise changing the
   // offset would re-fit the scene under the pointer and cause oscillation.
   if (!m_dragging)
@@ -83,16 +89,16 @@ void ScreenAlignmentPreview::setAlignment(const ScreenAlignment &alignment)
 
 void ScreenAlignmentPreview::fitScreens()
 {
-  if (!m_alignment.isValid() || !m_alignment.intervals()) {
+  if (!m_visual) {
     m_firstRect = {};
     m_secondRect = {};
     return;
   }
   const bool horizontal = m_alignment.orientation == Qt::Horizontal;
-  const QRectF first(QPointF(), m_alignment.firstSizeMm);
+  const QRectF first(QPointF(), m_visual->firstSize);
   const QRectF second(
-      horizontal ? QPointF(first.width(), m_alignment.offsetMm) : QPointF(m_alignment.offsetMm, first.height()),
-      m_alignment.secondSizeMm
+      horizontal ? QPointF(first.width(), m_visual->offset) : QPointF(m_visual->offset, first.height()),
+      m_visual->secondSize
   );
   const QRectF bounds = first.united(second);
   if (!std::isfinite(bounds.x()) || !std::isfinite(bounds.y()) || !std::isfinite(bounds.width()) ||
@@ -122,12 +128,14 @@ void ScreenAlignmentPreview::fitScreens()
 
 void ScreenAlignmentPreview::updateScreenRects()
 {
-  m_firstRect = QRectF(m_origin, m_alignment.firstSizeMm * m_scale);
+  if (!m_visual)
+    return;
+  m_firstRect = QRectF(m_origin, m_visual->firstSize * m_scale);
   const bool horizontal = m_alignment.orientation == Qt::Horizontal;
   const QPointF secondPosition =
-      horizontal ? QPointF(m_firstRect.right() + screenGap, m_origin.y() + m_alignment.offsetMm * m_scale)
-                 : QPointF(m_origin.x() + m_alignment.offsetMm * m_scale, m_firstRect.bottom() + screenGap);
-  m_secondRect = QRectF(secondPosition, m_alignment.secondSizeMm * m_scale);
+      horizontal ? QPointF(m_firstRect.right() + screenGap, m_origin.y() + m_visual->offset * m_scale)
+                 : QPointF(m_origin.x() + m_visual->offset * m_scale, m_firstRect.bottom() + screenGap);
+  m_secondRect = QRectF(secondPosition, m_visual->secondSize * m_scale);
 }
 
 void ScreenAlignmentPreview::paintEvent(QPaintEvent *)
@@ -139,7 +147,11 @@ void ScreenAlignmentPreview::paintEvent(QPaintEvent *)
   painter.drawRoundedRect(QRectF(rect()).adjusted(0.5, 0.5, -0.5, -0.5), 8, 8);
   if (m_firstRect.isEmpty() || m_secondRect.isEmpty()) {
     painter.setPen(palette().color(QPalette::Text));
-    painter.drawText(rect(), Qt::AlignCenter, tr("Enter valid screen dimensions to preview the alignment."));
+    painter.drawText(
+        rect(), Qt::AlignCenter,
+        m_alignment.calibration ? tr("Adjust the screen-edge points to preview the alignment.")
+                                : tr("Enter valid screen dimensions to preview the alignment.")
+    );
     return;
   }
 
@@ -157,7 +169,9 @@ void ScreenAlignmentPreview::paintEvent(QPaintEvent *)
       const auto text = QFontMetrics(title).elidedText(name, Qt::ElideMiddle, qMax(1, qRound(label.width())));
       painter.drawText(label.adjusted(0, 0, 0, -20), Qt::AlignCenter, text);
       painter.setFont(font());
-      const auto dimensions = tr("%1 × %2 mm").arg(size.width(), 0, 'f', 1).arg(size.height(), 0, 'f', 1);
+      const auto dimensions = m_visual->relative
+                                  ? tr("Relative scale")
+                                  : tr("%1 × %2 mm").arg(size.width(), 0, 'f', 1).arg(size.height(), 0, 'f', 1);
       painter.drawText(
           label.adjusted(0, 22, 0, 0), Qt::AlignCenter,
           QFontMetrics(font()).elidedText(dimensions, Qt::ElideRight, qMax(1, qRound(label.width())))
@@ -166,8 +180,8 @@ void ScreenAlignmentPreview::paintEvent(QPaintEvent *)
       painter.drawText(screen, Qt::AlignCenter, second ? QStringLiteral("2") : QStringLiteral("1"));
     }
   };
-  drawScreen(m_firstRect, m_alignment.firstName, m_alignment.firstSizeMm, false);
-  drawScreen(m_secondRect, m_alignment.secondName, m_alignment.secondSizeMm, true);
+  drawScreen(m_firstRect, m_alignment.firstName, m_visual->firstSize, false);
+  drawScreen(m_secondRect, m_alignment.secondName, m_visual->secondSize, true);
 
   const auto intervals = m_alignment.intervals();
   if (m_alignment.enabled && intervals && intervals->hasOverlap) {
@@ -203,7 +217,7 @@ void ScreenAlignmentPreview::paintEvent(QPaintEvent *)
     painter.drawLine(secondEdge);
   }
 
-  if (hasFocus() && m_alignment.enabled) {
+  if (hasFocus() && m_alignment.enabled && !m_alignment.calibration) {
     painter.setBrush(Qt::NoBrush);
     painter.setPen(QPen(accent, 1, Qt::DashLine));
     painter.drawRoundedRect(m_secondRect.adjusted(-4, -4, 4, 4), 8, 8);
@@ -219,7 +233,8 @@ void ScreenAlignmentPreview::resizeEvent(QResizeEvent *event)
 
 void ScreenAlignmentPreview::mousePressEvent(QMouseEvent *event)
 {
-  if (event->button() == Qt::LeftButton && m_alignment.enabled && m_secondRect.contains(event->position())) {
+  if (event->button() == Qt::LeftButton && m_alignment.enabled && !m_alignment.calibration &&
+      m_secondRect.contains(event->position())) {
     setFocus(Qt::MouseFocusReason);
     m_dragging = true;
     m_dragStart = event->position();
@@ -240,7 +255,7 @@ void ScreenAlignmentPreview::mouseMoveEvent(QMouseEvent *event)
     event->accept();
     return;
   }
-  if (m_alignment.enabled && m_secondRect.contains(event->position()))
+  if (m_alignment.enabled && !m_alignment.calibration && m_secondRect.contains(event->position()))
     setCursor(m_alignment.orientation == Qt::Horizontal ? Qt::SizeVerCursor : Qt::SizeHorCursor);
   else
     unsetCursor();
@@ -268,7 +283,7 @@ void ScreenAlignmentPreview::finishDrag()
 
 void ScreenAlignmentPreview::keyPressEvent(QKeyEvent *event)
 {
-  if (m_alignment.enabled) {
+  if (m_alignment.enabled && !m_alignment.calibration) {
     const bool horizontal = m_alignment.orientation == Qt::Horizontal;
     const int negative = horizontal ? Qt::Key_Up : Qt::Key_Left;
     const int positive = horizontal ? Qt::Key_Down : Qt::Key_Right;

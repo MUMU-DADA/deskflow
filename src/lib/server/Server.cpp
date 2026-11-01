@@ -10,6 +10,7 @@
 
 #include "base/IEventQueue.h"
 #include "base/Log.h"
+#include "common/AlignmentProtocol.h"
 #include "deskflow/AppUtil.h"
 #include "deskflow/Computer.h"
 #include "deskflow/DeskflowException.h"
@@ -18,12 +19,14 @@
 #include "deskflow/PacketStreamFilter.h"
 #include "deskflow/ProtocolTypes.h"
 #include "deskflow/StreamChunker.h"
+#include "deskflow/ipc/AlignmentEvent.h"
 #include "deskflow/ipc/CoreIpc.h"
 #include "net/TCPSocket.h"
 #include "server/ClientListener.h"
 #include "server/ClientProxy.h"
 #include "server/ClientProxyUnknown.h"
 #include "server/PrimaryClient.h"
+#include <QJsonArray>
 
 #include <algorithm>
 #ifdef _WIN32
@@ -149,12 +152,25 @@ Server::Server(ServerConfig &config, PrimaryClient *primaryClient, deskflow::Com
     m_lockedToComputer = true;
   }
   m_gameGuardTimer = m_events->newTimer(0.1, nullptr);
-  m_events->addHandler(EventTypes::Timer, m_gameGuardTimer, [this](const auto &) { refreshFullscreenGameGuard(); });
+  m_events->addHandler(EventTypes::Timer, m_gameGuardTimer, [this](const auto &) {
+    refreshFullscreenGameGuard();
+    if (m_alignmentSession.expired())
+      cancelAlignment("timeout");
+  });
+  m_events->addHandler(EventTypes::AlignmentLocal, alignmentEventTarget(), [this](const auto &event) {
+    handleAlignmentLocal(event);
+  });
+  m_events->addEvent(Event(
+      EventTypes::AlignmentLocal, alignmentEventTarget(), new AlignmentEventData(AlignmentEventData::Kind::Initialize)
+  ));
   refreshFullscreenGameGuard();
 }
 
 Server::~Server()
 {
+  cancelAlignment("disconnected");
+  m_events->removeHandler(EventTypes::AlignmentLocal, alignmentEventTarget());
+  ipcAlignmentCoreStopped();
   m_events->removeHandler(EventTypes::Timer, m_gameGuardTimer);
   m_events->deleteTimer(m_gameGuardTimer);
   // remove event handlers and timers
@@ -216,6 +232,7 @@ bool Server::setConfig(const ServerConfig &config)
 
   // close clients that are connected but being dropped from the
   // configuration.
+  cancelAlignment("configuration_changed");
   closeClients(config);
 
   // cut over
@@ -818,6 +835,10 @@ bool Server::isSwitchOkay(
     BaseClientProxy *newComputer, Direction dir, int32_t x, int32_t y, int32_t xActive, int32_t yActive
 )
 {
+  if (m_alignmentSession.blocks(QString::fromStdString(getName(m_active)))) {
+    stopSwitch();
+    return false;
+  }
   refreshFullscreenGameGuard();
   if (isForegroundGameGuarded()) {
     stopSwitch();
@@ -1116,8 +1137,216 @@ void Server::sendOptions(BaseClientProxy *client) const
   // this capability may send DFSG; do not change Synergy/Barrier wire versions.
   optionsList.push_back(kOptionFullscreenGameGuard);
   optionsList.push_back(1);
+  optionsList.push_back(kOptionAlignmentCalibration);
+  optionsList.push_back(1);
   client->resetOptions();
   client->setOptions(optionsList);
+}
+
+void Server::publishAlignmentCapabilities()
+{
+  if (!m_alignmentUiReady)
+    return;
+  QJsonArray peers;
+  for (const auto &[name, client] : m_clients) {
+    peers.append(
+        QJsonObject{
+            {"name", QString::fromStdString(name)},
+            {"protocol", client == m_primaryClient || client->alignmentCapable() ? 1 : 0},
+            {"uiReady", client == m_primaryClient ? m_alignmentUiReady : client->alignmentUiReady()}
+        }
+    );
+  }
+  ipcSendAlignment(
+      {{"type", "capabilities"},
+       {"source", QString::fromStdString(getName(m_primaryClient))},
+       {"role", "server"},
+       {"protocol", 1},
+       {"peers", peers}},
+      m_alignmentUiGeneration
+  );
+}
+
+bool Server::deliverAlignment(const QString &target, const QJsonObject &message)
+{
+  if (target == QString::fromStdString(getName(m_primaryClient))) {
+    if (!m_alignmentUiReady)
+      return false;
+    ipcSendAlignment(message, m_alignmentUiGeneration);
+    return true;
+  }
+  const auto found = m_clients.find(target.toStdString());
+  if (found == m_clients.end() || !found->second->alignmentUiReady())
+    return false;
+  auto wireMessage = message;
+  // The layout uses canonical names, but the peer only knows its hello name.
+  wireMessage.insert("target", QString::fromStdString(found->second->getName()));
+  return found->second->sendAlignmentMessage(wireMessage);
+}
+
+void Server::cancelAlignment(const QString &reason)
+{
+  if (m_alignmentSession.id.isEmpty())
+    return;
+  const auto session = m_alignmentSession.id;
+  const auto localName = QString::fromStdString(getName(m_primaryClient));
+  auto targets = m_alignmentSession.participants;
+  targets.insert(localName); // The owner can be the server while both markers are on clients.
+  m_alignmentSession.clear();
+  stopSwitch();
+  for (const auto &target : targets) {
+    const QJsonObject message{
+        {"type", "cancel"}, {"session", session}, {"source", localName}, {"target", target}, {"reason", reason}
+    };
+    if (target == localName) {
+      if (m_alignmentUiReady)
+        ipcSendAlignment(message, m_alignmentUiGeneration);
+    } else if (const auto found = m_clients.find(target.toStdString()); found != m_clients.end()) {
+      // A UI can vanish between its capability update and cancellation. Its
+      // capable core should still discard the session, even without a GUI.
+      auto wireMessage = message;
+      wireMessage.insert("target", QString::fromStdString(found->second->getName()));
+      found->second->sendAlignmentMessage(wireMessage);
+    }
+  }
+}
+
+void Server::handleAlignmentLocal(const Event &event)
+{
+  const auto *data = dynamic_cast<AlignmentEventData *>(event.getDataObject());
+  if (!data)
+    return;
+  const auto localName = QString::fromStdString(getName(m_primaryClient));
+  if (data->kind == AlignmentEventData::Kind::Initialize) {
+    ipcAlignmentCoreReady(localName, "server");
+    return;
+  }
+  if (data->kind == AlignmentEventData::Kind::UiAvailability) {
+    m_alignmentUiReady = data->available;
+    m_alignmentUiGeneration = data->generation;
+    if (!m_alignmentUiReady)
+      cancelAlignment("ui_unavailable");
+    for (const auto &[name, client] : m_clients) {
+      if (client != m_primaryClient && client->alignmentCapable())
+        client->sendAlignmentMessage(
+            {{"type", "capability"}, {"version", 1}, {"uiReady", m_alignmentUiReady}, {"source", localName}}
+        );
+    }
+    publishAlignmentCapabilities();
+    return;
+  }
+  if (m_alignmentUiReady && data->generation == m_alignmentUiGeneration)
+    routeAlignmentMessage(localName, data->message, true);
+}
+
+void Server::handleAlignmentPeer(BaseClientProxy *client, const Event &event)
+{
+  if (!m_clientSet.contains(client))
+    return;
+  const auto *data = dynamic_cast<AlignmentEventData *>(event.getDataObject());
+  if (!data)
+    return;
+  const auto source = QString::fromStdString(getName(client));
+  if (data->message.value("type") == "capability") {
+    if (!client->alignmentUiReady() && m_alignmentSession.participants.contains(source))
+      cancelAlignment("ui_unavailable");
+    client->sendAlignmentMessage(
+        {{"type", "capability"},
+         {"version", 1},
+         {"uiReady", m_alignmentUiReady},
+         {"source", QString::fromStdString(getName(m_primaryClient))}}
+    );
+    publishAlignmentCapabilities();
+    return;
+  }
+  routeAlignmentMessage(source, data->message, false);
+}
+
+void Server::routeAlignmentMessage(const QString &source, QJsonObject message, bool fromLocalUi)
+{
+  const auto localName = QString::fromStdString(getName(m_primaryClient));
+  const auto session = message.value("session").toString();
+  const auto type = message.value("type").toString();
+  const auto target =
+      QString::fromStdString(m_config->getCanonicalName(message.value("target").toString().toStdString()));
+  message.insert("source", source);
+  message.insert("target", target);
+  const auto fail = [&](const QString &reason) {
+    auto reply = deskflow::alignment::error(message, localName, reason);
+    reply.insert("target", source);
+    if (fromLocalUi)
+      ipcSendAlignment(reply, m_alignmentUiGeneration);
+    else
+      deliverAlignment(source, reply);
+    if (m_alignmentSession.id == session)
+      cancelAlignment(reason);
+  };
+
+  if (m_alignmentSession.expired())
+    cancelAlignment("timeout");
+  if (type == "show") {
+    if (!fromLocalUi) // Only the server GUI owns calibration sessions.
+      return;
+    if (!m_alignmentSession.id.isEmpty() && m_alignmentSession.id != session) {
+      fail("busy");
+      return;
+    }
+    if (target.isEmpty()) {
+      fail("peer_disconnected");
+      return;
+    }
+    if (target != localName) {
+      const auto found = m_clients.find(target.toStdString());
+      if (found == m_clients.end()) {
+        fail("peer_disconnected");
+        return;
+      }
+      if (!found->second->alignmentCapable()) {
+        fail("unsupported");
+        return;
+      }
+      if (!found->second->alignmentUiReady()) {
+        fail("ui_unavailable");
+        return;
+      }
+    }
+    if (!m_alignmentSession.participants.contains(target) && m_alignmentSession.participants.size() >= 2) {
+      fail("invalid_target");
+      return;
+    }
+    m_alignmentSession.join(session, target);
+    m_alignmentSession.showRevision(target, message.value("revision").toInt());
+  } else {
+    // Stale/foreign session messages are consumed but cannot affect the input
+    // connection, a different calibration, or another client's drag hold.
+    if (m_alignmentSession.id != session || m_alignmentSession.id.isEmpty())
+      return;
+    if (!fromLocalUi && (!m_alignmentSession.participants.contains(source) || target != localName))
+      return;
+    if (type == "close" || type == "cancel") {
+      cancelAlignment(message.value("reason").toString("user_cancelled"));
+      return;
+    }
+    if (type == "error") {
+      ipcSendAlignment(message, m_alignmentUiGeneration);
+      cancelAlignment(message.value("reason").toString("calibration_failed"));
+      return;
+    }
+    if (fromLocalUi && !m_alignmentSession.participants.contains(target))
+      return;
+    if ((type == "points" || type == "ready") && m_alignmentSession.participants.contains(source)) {
+      if (!m_alignmentSession.matchesRevision(source, message.value("revision").toInt()))
+        return;
+      const auto seq = static_cast<uint64_t>(message.value("seq").toDouble());
+      if (!m_alignmentSession.point(source, seq, type == "points" && message.value("dragging").toBool()))
+        return;
+      if (m_alignmentSession.blocks(QString::fromStdString(getName(m_active))))
+        stopSwitch();
+    }
+    m_alignmentSession.touch();
+  }
+  if (!deliverAlignment(target, message))
+    fail("ui_unavailable");
 }
 
 void Server::processOptions()
@@ -1583,6 +1812,8 @@ void Server::onKeyDown(KeyID id, KeyModifierMask mask, KeyButton button, const s
 {
   LOG_VERBOSE("onKeyDown id=%d mask=0x%04x button=0x%04x lang=%s", id, mask, button, lang.c_str());
   assert(m_active != nullptr);
+  if (id == kKeyEscape && !m_alignmentSession.id.isEmpty())
+    cancelAlignment("escape"); // Escape is still relayed normally.
 
   // relay
   if (!m_keyboardBroadcasting && IKeyState::KeyInfo::isDefault(computers)) {
@@ -1641,6 +1872,9 @@ void Server::onMouseDown(ButtonID id)
 {
   LOG_VERBOSE("onMouseDown id=%d", id);
   assert(m_active != nullptr);
+  m_alignmentSession.mouseDown(id, QString::fromStdString(getName(m_active)));
+  if (m_alignmentSession.blocks(QString::fromStdString(getName(m_active))))
+    stopSwitch();
 
   // relay
   m_active->mouseDown(id);
@@ -1650,6 +1884,7 @@ void Server::onMouseUp(ButtonID id)
 {
   LOG_VERBOSE("onMouseUp id=%d", id);
   assert(m_active != nullptr);
+  m_alignmentSession.mouseUp(id);
 
   // relay
   m_active->mouseUp(id);
@@ -1952,6 +2187,9 @@ bool Server::addClient(BaseClientProxy *client)
   m_events->addHandler(EventTypes::ClipboardChanged, client->getEventTarget(), [this, client](const auto &e) {
     handleClipboardChanged(e, client);
   });
+  m_events->addHandler(EventTypes::AlignmentPeer, client->getEventTarget(), [this, client](const auto &event) {
+    handleAlignmentPeer(client, event);
+  });
 
   // add to list
   m_clientSet.insert(client);
@@ -1979,13 +2217,17 @@ bool Server::removeClient(BaseClientProxy *client)
   }
 
   // remove event handlers
+  if (m_alignmentSession.participants.contains(QString::fromStdString(getName(client))))
+    cancelAlignment("peer_disconnected");
   m_events->removeHandler(ComputerShapeChanged, client->getEventTarget());
   m_events->removeHandler(ClipboardGrabbed, client->getEventTarget());
   m_events->removeHandler(ClipboardChanged, client->getEventTarget());
+  m_events->removeHandler(AlignmentPeer, client->getEventTarget());
 
   // remove from list
   m_clients.erase(getName(client));
   m_clientSet.erase(i);
+  publishAlignmentCapabilities();
 
   return true;
 }

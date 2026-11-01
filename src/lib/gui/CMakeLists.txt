@@ -46,6 +46,8 @@ add_library(${target} STATIC
   core/CoreProcess.h
   core/NetworkMonitor.cpp
   core/NetworkMonitor.h
+  core/ScreenCalibrationController.cpp
+  core/ScreenCalibrationController.h
   dialogs/AboutDialog.cpp
   dialogs/AboutDialog.h
   dialogs/AboutDialog.ui
@@ -70,6 +72,8 @@ add_library(${target} STATIC
   dialogs/ServerConfigDialog.ui
   dialogs/ScreenAlignmentDialog.cpp
   dialogs/ScreenAlignmentDialog.h
+  dialogs/ScreenCalibrationDialog.cpp
+  dialogs/ScreenCalibrationDialog.h
   dialogs/SettingsDialog.cpp
   dialogs/SettingsDialog.h
   dialogs/SettingsDialog.ui
@@ -103,6 +107,8 @@ add_library(${target} STATIC
   widgets/ComputerSetupView.h
   widgets/ScreenAlignmentPreview.cpp
   widgets/ScreenAlignmentPreview.h
+  widgets/ScreenCalibrationOverlay.cpp
+  widgets/ScreenCalibrationOverlay.h
   widgets/FingerprintPreview.cpp
   widgets/FingerprintPreview.h
   widgets/KeySequenceWidget.cpp

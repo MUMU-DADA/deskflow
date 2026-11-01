@@ -10,6 +10,8 @@
 //! Optional client-to-server fullscreen-game state: enter sequence, boolean.
 //! Only sent after FGCP=1 is advertised in DSOP. No base protocol version change.
 extern const char *const kMsgDFullscreenGameGuard;
+//! ALCP=1 negotiated, bounded length-prefixed calibration JSON. No base wire-version change.
+extern const char *const kMsgDAlignment;
 
 #include <cstdint>
 /**

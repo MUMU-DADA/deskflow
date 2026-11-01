@@ -11,6 +11,7 @@
 #include "base/IEventQueue.h"
 #include "base/Log.h"
 #include "client/Client.h"
+#include "common/AlignmentProtocol.h"
 #include "deskflow/Clipboard.h"
 #include "deskflow/ClipboardChunk.h"
 #include "deskflow/DeskflowException.h"
@@ -73,6 +74,17 @@ void ServerProxy::resetKeepAliveAlarm()
 void ServerProxy::onFullscreenGameGuardChanged(uint32_t sequence, bool guarded)
 {
   ProtocolUtil::writef(m_stream, kMsgDFullscreenGameGuard, sequence, guarded ? 1 : 0);
+}
+
+void ServerProxy::sendAlignmentMessage(const QJsonObject &message)
+{
+  if (!m_client->alignmentProtocolEnabled())
+    return;
+  const auto data = deskflow::alignment::encode(message, true);
+  if (!data.isEmpty()) {
+    const std::string bytes(data.constData(), data.size());
+    ProtocolUtil::writef(m_stream, kMsgDAlignment, &bytes);
+  }
 }
 
 void ServerProxy::setKeepAliveRate(double rate)
@@ -222,7 +234,15 @@ ServerProxy::ConnectionResult ServerProxy::parseMessage(const uint8_t *code)
 {
   using enum ConnectionResult;
 
-  if (memcmp(code, kMsgDMouseMove, 4) == 0) {
+  if (memcmp(code, kMsgDAlignment, 4) == 0) {
+    if (!m_client->alignmentProtocolEnabled())
+      throw BadClientException("Unnegotiated calibration packet");
+    std::string bytes;
+    if (!ProtocolUtil::readStringWithLimit(m_stream, bytes, deskflow::alignment::maxMessageBytes))
+      throw BadClientException("Incomplete calibration packet");
+    if (const auto message = deskflow::alignment::decode(QByteArray::fromStdString(bytes), true))
+      m_client->receiveAlignmentMessage(*message);
+  } else if (memcmp(code, kMsgDMouseMove, 4) == 0) {
     mouseMove();
   }
 
