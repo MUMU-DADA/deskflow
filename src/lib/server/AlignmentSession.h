@@ -41,7 +41,9 @@ public:
     if (!participants.contains(name) || (sequences.contains(name) && seq <= sequences.value(name)))
       return false;
     sequences.insert(name, seq);
-    if (dragging)
+    // GUI heartbeats are advisory. Only shared-input button-down can authorize
+    // an edge hold; a delayed heartbeat must not undo native release/cutover.
+    if (dragging && nativeDragSources.contains(name))
       dragLeases.insert(name, now + std::chrono::seconds(3));
     else
       dragLeases.remove(name);
@@ -50,14 +52,29 @@ public:
   }
   void mouseDown(uint32_t button, const QString &name, Time now = Clock::now())
   {
-    if (!id.isEmpty() && participants.contains(name))
+    if (!id.isEmpty() && participants.contains(name)) {
+      nativeDragSources.insert(name);
       buttons.insert(button, {name, now + std::chrono::seconds(3)});
+    }
   }
   void mouseUp(uint32_t button)
   {
-    if (const auto it = buttons.constFind(button); it != buttons.cend())
+    if (const auto it = buttons.constFind(button); it != buttons.cend()) {
       dragLeases.remove(it.value().first);
+      nativeDragSources.remove(it.value().first);
+    }
     buttons.remove(button);
+  }
+  void leave(const QString &name)
+  {
+    nativeDragSources.remove(name);
+    dragLeases.remove(name);
+    for (auto it = buttons.begin(); it != buttons.end();) {
+      if (it.value().first == name)
+        it = buttons.erase(it);
+      else
+        ++it;
+    }
   }
   bool blocks(const QString &name, Time now = Clock::now()) const
   {
@@ -90,5 +107,6 @@ private:
   QHash<QString, uint64_t> sequences;
   QHash<QString, int> revisions;
   QHash<QString, Time> dragLeases;
+  QSet<QString> nativeDragSources;
   QHash<uint32_t, std::pair<QString, Time>> buttons;
 };

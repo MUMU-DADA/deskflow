@@ -531,6 +531,7 @@ void Server::switchComputer(BaseClientProxy *dst, int32_t x, int32_t y, bool for
 #endif
 
     // cut over
+    m_alignmentSession.leave(QString::fromStdString(getName(m_active)));
     m_active = dst;
 
     // increment enter sequence number

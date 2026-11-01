@@ -81,6 +81,8 @@ public:
     setAttribute(Qt::WA_ShowWithoutActivating);
     setAttribute(Qt::WA_MacAlwaysShowToolWindow);
     setFocusPolicy(Qt::NoFocus);
+    // Let a later hover report a missed release after native capture was lost.
+    setMouseTracking(true);
     setObjectName(QStringLiteral("calibrationMarker%1").arg(static_cast<int>(point)));
     setAccessibleName(ScreenCalibrationOverlay::tr("Screen-edge calibration marker %1").arg(label()));
     setToolTip(
@@ -112,6 +114,15 @@ public:
   }
 
 protected:
+  bool event(QEvent *event) override
+  {
+    if (m_pressed && (event->type() == QEvent::Hide || event->type() == QEvent::WindowBlocked)) {
+      stopDrag();
+      dragEnded();
+    }
+    return QWidget::event(event);
+  }
+
   void paintEvent(QPaintEvent *) override
   {
     QPainter painter(this);
@@ -167,6 +178,14 @@ protected:
   void mouseMoveEvent(QMouseEvent *event) override
   {
     if (m_pressed) {
+      if (!event->buttons().testFlag(Qt::LeftButton)) {
+        // A native release can be delivered elsewhere after capture is lost.
+        // Use this event's button state, not Qt's cached global button state.
+        stopDrag();
+        event->accept();
+        dragEnded();
+        return;
+      }
       const auto delta = event->globalPosition() - m_pressPosition;
       event->accept();
       moved(delta);

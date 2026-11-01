@@ -263,6 +263,8 @@ void AlignmentTransportTests::boundedDragLeases()
   const auto now = AlignmentSession::Clock::now();
   QVERIFY(session.join("id", "first", now));
   QVERIFY(session.join("id", "second", now));
+  QVERIFY(session.point("second", 1, true, now)); // Client-local mouse gestures do not authorize shared-input holds.
+  QVERIFY(!session.blocks("second", now));
   session.mouseDown(1, "first", now);
   QVERIFY(session.blocks("first", now));
   QVERIFY(!session.blocks("second", now));
@@ -280,7 +282,14 @@ void AlignmentTransportTests::boundedDragLeases()
   QVERIFY(session.blocks("first", now + 9s));
   QVERIFY(session.point("first", 5, true, now + 9s));
   session.mouseUp(1);
-  QVERIFY(!session.blocks("first", now + 9s));
+  QVERIFY(session.point("first", 6, true, now + 9s));
+  QVERIFY(!session.blocks("first", now + 9s)); // A late true heartbeat cannot undo native mouse-up.
+  session.mouseDown(1, "first", now + 9s);
+  QVERIFY(session.point("first", 7, true, now + 10s));
+  QVERIFY(session.blocks("first", now + 12500ms)); // GUI renewal works after the new native-down lease expires.
+  session.leave("first");
+  QVERIFY(session.point("first", 8, true, now + 12500ms));
+  QVERIFY(!session.blocks("first", now + 12500ms));
   session.clear();
   QVERIFY(session.id.isEmpty());
   QVERIFY(!session.blocks("first", now + 9s));

@@ -73,6 +73,10 @@ protected:
   bool eventFilter(QObject *watched, QEvent *event) override;
 
 private:
+  // Allows event tests to seed a hidden session without bypassing the public
+  // platform/screen capability checks or displaying desktop markers.
+  friend class ScreenCalibrationOverlayTests;
+
   bool placeMarkers();
   void verifyPlacement(quint64 generation);
   void beginDrag(int point);

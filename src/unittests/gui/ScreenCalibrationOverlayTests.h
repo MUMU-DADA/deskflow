@@ -19,6 +19,8 @@ private Q_SLOTS:
   void unsupportedPlatformsAndMultipleScreens();
   void ownerDestructionDeletesMarkerWindows();
   void independentOverlayDestructionIsSafe();
+  void interruptedDragEndsOnce_data();
+  void interruptedDragEndsOnce();
   void relativePreviewIsReadOnly();
   void renderExamples();
 };

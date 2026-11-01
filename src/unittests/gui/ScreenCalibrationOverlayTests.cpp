@@ -11,6 +11,7 @@
 #include <QApplication>
 #include <QDir>
 #include <QFontDatabase>
+#include <QHideEvent>
 #include <QImage>
 #include <QMouseEvent>
 #include <QPainter>
@@ -146,6 +147,77 @@ void ScreenCalibrationOverlayTests::independentOverlayDestructionIsSafe()
   delete overlay;
   QVERIFY(marker.isNull());
   QVERIFY(owner.children().isEmpty());
+}
+
+void ScreenCalibrationOverlayTests::interruptedDragEndsOnce_data()
+{
+  QTest::addColumn<int>("interruption");
+  QTest::newRow("move-without-buttons") << 0;
+  QTest::newRow("move-with-only-right-button") << 1;
+  QTest::newRow("hidden") << 2;
+  QTest::newRow("blocked-by-modal-window") << 3;
+}
+
+void ScreenCalibrationOverlayTests::interruptedDragEndsOnce()
+{
+  QFETCH(int, interruption);
+  QCOMPARE(QGuiApplication::platformName(), QStringLiteral("offscreen"));
+  Overlay overlay;
+  // Seed only the session state. No showForEdge/placeMarkers/native window
+  // calls: production still rejects offscreen, as tested separately above.
+  overlay.m_running = true;
+  overlay.m_screenGeometry = QRect(0, 0, 1920, 1080);
+  overlay.m_positions = {0.2, 0.8};
+  const auto originalPositions = overlay.positions();
+  auto *marker = overlay.pointWidget(0);
+  QSignalSpy dragging(&overlay, &Overlay::dragStateChanged);
+  QSignalSpy moved(&overlay, &Overlay::pointMoved);
+  const QPointF local(30, 18);
+  const QPointF global(1881, 216);
+  const auto press = [&] {
+    QMouseEvent event(QEvent::MouseButtonPress, local, global, Qt::LeftButton, Qt::LeftButton, Qt::NoModifier);
+    QApplication::sendEvent(marker, &event);
+  };
+  const auto release = [&] {
+    QMouseEvent event(QEvent::MouseButtonRelease, local, global, Qt::LeftButton, Qt::NoButton, Qt::NoModifier);
+    QApplication::sendEvent(marker, &event);
+  };
+  const auto interrupt = [&] {
+    if (interruption < 2) {
+      QMouseEvent event(
+          QEvent::MouseMove, local + QPointF(0, 40), global + QPointF(0, 40), Qt::NoButton,
+          interruption == 0 ? Qt::NoButton : Qt::RightButton, Qt::NoModifier
+      );
+      QApplication::sendEvent(marker, &event);
+    } else if (interruption == 2) {
+      QHideEvent event;
+      QApplication::sendEvent(marker, &event);
+    } else {
+      QEvent event(QEvent::WindowBlocked);
+      QApplication::sendEvent(marker, &event);
+    }
+  };
+
+  press();
+  QCOMPARE(dragging.count(), 1);
+  QCOMPARE(dragging.at(0).at(0).toBool(), true);
+  interrupt();
+  QCOMPARE(dragging.count(), 2);
+  QCOMPARE(dragging.at(1).at(0).toBool(), false);
+  QCOMPARE(moved.count(), 0);
+  QCOMPARE(overlay.positions(), originalPositions);
+  QVERIFY(overlay.isRunning()); // End the gesture, not the calibration session.
+  for (int i = 0; i < 3; ++i)
+    QVERIFY(!overlay.pointWidget(i)->isVisible());
+
+  interrupt();
+  release(); // A delayed native release must not end the same gesture twice.
+  QCOMPARE(dragging.count(), 2);
+  press();
+  release();
+  QCOMPARE(dragging.count(), 4);
+  QCOMPARE(dragging.at(2).at(0).toBool(), true);
+  QCOMPARE(dragging.at(3).at(0).toBool(), false);
 }
 
 void ScreenCalibrationOverlayTests::relativePreviewIsReadOnly()

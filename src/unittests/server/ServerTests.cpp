@@ -478,13 +478,17 @@ void ServerTests::calibrationRevisionAliasesAndManualLock()
   QCOMPARE(test.remote->messages.last().value("target").toString(), QString("remote-alias"));
   QCOMPARE(test.remote->messages.last().value("source").toString(), QString("guard-primary"));
   test.switchTo("guard-remote");
+  test.button(true);
   auto point =
       QJsonObject{{"type", "points"}, {"target", "guard-primary"}, {"points", QJsonArray{0.2, 0.8}}, {"revision", 1},
                   {"seq", 1},         {"dragging", true}};
   test.alignment(point, true);
   test.motion(false, -200, 0);
   QCOMPARE(test.primary.enters, 0);
+  test.button(false);
   test.startAlignment(2);
+  test.button(true); // Reauthorize this source; expire only the immediate native-down lease.
+  QTest::qWait(3100);
   point["seq"] = 100; // A delayed old-revision packet must not reinstate its drag hold.
   test.alignment(point, true);
   test.motion(false, -200, 0);
@@ -495,6 +499,57 @@ void ServerTests::calibrationRevisionAliasesAndManualLock()
   test.motion(true, 100, 50);
   QCOMPARE(test.remote->enters, 1);
   test.manualLock(false);
+  test.motion(true, 100, 50);
+  QCOMPARE(test.remote->enters, 2);
+}
+
+void ServerTests::calibrationNativeReleaseRejectsStaleDragHeartbeats()
+{
+  GuardServerFixture test;
+  test.startAlignment();
+  auto point =
+      QJsonObject{{"type", "points"}, {"target", "guard-primary"}, {"points", QJsonArray{0.2, 0.8}}, {"revision", 1},
+                  {"seq", 1},         {"dragging", true}};
+  test.button(true);
+  test.alignment(point);
+  test.motion(true, 100, 50);
+  QCOMPARE(test.remote->enters, 0);
+  test.button(false);
+  for (int seq = 2; seq <= 4; ++seq) {
+    point["seq"] = seq;
+    test.alignment(point); // The overlay missed release and continues true heartbeats.
+  }
+  test.motion(true, 100, 50);
+  QCOMPARE(test.remote->enters, 1);
+  test.switchTo("guard-primary");
+  test.button(true); // A new real drag can authorize holds again.
+  point["seq"] = 5;
+  test.alignment(point);
+  test.motion(true, 100, 50);
+  QCOMPARE(test.remote->enters, 1);
+  test.button(false);
+  point["seq"] = 6;
+  test.alignment(point);
+  test.motion(true, 100, 50);
+  QCOMPARE(test.remote->enters, 2);
+}
+
+void ServerTests::calibrationExplicitSwitchRejectsOldSourceHeartbeats()
+{
+  GuardServerFixture test;
+  test.startAlignment();
+  test.button(true);
+  auto point =
+      QJsonObject{{"type", "points"}, {"target", "guard-primary"}, {"points", QJsonArray{0.2, 0.8}}, {"revision", 1},
+                  {"seq", 1},         {"dragging", true}};
+  test.alignment(point);
+  test.switchTo("guard-remote"); // No mouse-up: cutover must revoke the old source's authority.
+  point["seq"] = 2;
+  test.alignment(point);
+  test.motion(false, -200, 0);
+  QCOMPARE(test.primary.enters, 1);
+  point["seq"] = 3;
+  test.alignment(point); // Still stale even after returning to the original source.
   test.motion(true, 100, 50);
   QCOMPARE(test.remote->enters, 2);
 }

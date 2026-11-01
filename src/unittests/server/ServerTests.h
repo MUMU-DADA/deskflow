@@ -19,6 +19,8 @@ private Q_SLOTS:
   void calibrationDragBlocksOnlyActiveEdgesAndEscapeReleases();
   void calibrationMissingMouseUpExpiresDespitePings();
   void calibrationRevisionAliasesAndManualLock();
+  void calibrationNativeReleaseRejectsStaleDragHeartbeats();
+  void calibrationExplicitSwitchRejectsOldSourceHeartbeats();
   void edgeMappingStaysInsideDestination_data();
   void edgeMappingStaysInsideDestination();
 
