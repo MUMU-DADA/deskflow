@@ -12,6 +12,7 @@
 #include "common/Hotkey.h"
 #include "gui/config/ComputerConfig.h"
 #include "gui/config/ComputerList.h"
+#include "gui/config/ScreenAlignment.h"
 
 #include <QList>
 
@@ -56,6 +57,13 @@ public:
   QString configFile() const;
   bool useExternalConfig() const;
   void addClient(const QString &clientName);
+  QList<ScreenAlignmentPair> adjacentPairs() const;
+  std::optional<ScreenAlignment> screenAlignment(const ScreenAlignmentPair &pair) const;
+  bool setScreenAlignment(const ScreenAlignment &alignment);
+  bool clearScreenAlignment(const ScreenAlignmentPair &pair);
+  // Call after topology/name edits. Non-adjacent, reversed or reoriented pairs
+  // are cleared rather than silently applying old measurements to another edge.
+  void reconcileScreenAlignments();
 
 private:
   void recall();
@@ -68,6 +76,7 @@ private:
   void setComputers(const ComputerList &computers)
   {
     m_computers = computers;
+    reconcileScreenAlignments();
   }
   void addComputer(const Computer &computer)
   {
@@ -87,6 +96,7 @@ private:
   HotkeyList m_Hotkeys;
 
   ComputerList m_computers;
+  QList<ScreenAlignment> m_screenAlignments;
   int m_columns;
   int m_rows;
 };

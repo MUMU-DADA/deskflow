@@ -25,8 +25,8 @@
 #include "server/ClientProxyUnknown.h"
 #include "server/PrimaryClient.h"
 
-#ifdef _WIN32
 #include <algorithm>
+#ifdef _WIN32
 #include <array>
 #endif
 #include <cmath>
@@ -591,12 +591,14 @@ void Server::mapToPixel(const BaseClientProxy *client, Direction dir, float f, i
     using enum Direction;
   case Left:
   case Right:
-    y = static_cast<int32_t>(f * sh) + sy;
+    // A narrow destination interval can round its last fraction up to 1.0f.
+    // Keep the along-edge coordinate inside the destination's pixel bounds.
+    y = std::clamp(static_cast<int32_t>(f * sh), 0, sh - 1) + sy;
     break;
 
   case Top:
   case Bottom:
-    x = static_cast<int32_t>(f * sw) + sx;
+    x = std::clamp(static_cast<int32_t>(f * sw), 0, sw - 1) + sx;
     break;
 
   case NoDirection:

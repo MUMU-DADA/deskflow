@@ -40,6 +40,8 @@ add_library(${target} STATIC
   config/ComputerList.h
   config/ServerConfig.cpp
   config/ServerConfig.h
+  config/ScreenAlignment.cpp
+  config/ScreenAlignment.h
   core/CoreProcess.cpp
   core/CoreProcess.h
   core/NetworkMonitor.cpp
@@ -66,6 +68,8 @@ add_library(${target} STATIC
   dialogs/ServerConfigDialog.cpp
   dialogs/ServerConfigDialog.h
   dialogs/ServerConfigDialog.ui
+  dialogs/ScreenAlignmentDialog.cpp
+  dialogs/ScreenAlignmentDialog.h
   dialogs/SettingsDialog.cpp
   dialogs/SettingsDialog.h
   dialogs/SettingsDialog.ui
@@ -97,6 +101,8 @@ add_library(${target} STATIC
   validators/IpAddressValidator.h
   widgets/ComputerSetupView.cpp
   widgets/ComputerSetupView.h
+  widgets/ScreenAlignmentPreview.cpp
+  widgets/ScreenAlignmentPreview.h
   widgets/FingerprintPreview.cpp
   widgets/FingerprintPreview.h
   widgets/KeySequenceWidget.cpp

@@ -73,14 +73,17 @@ public:
   int enters = 0;
   int leaves = 0;
   uint32_t sides = 0;
+  QRect shape{0, 0, 100, 100};
   void *getEventTarget() const override
   {
     return const_cast<GuardPrimary *>(this);
   }
   void getShape(int32_t &x, int32_t &y, int32_t &w, int32_t &h) const override
   {
-    x = y = 0;
-    w = h = 100;
+    x = shape.x();
+    y = shape.y();
+    w = shape.width();
+    h = shape.height();
   }
   void getCursorPos(int32_t &x, int32_t &y) const override
   {
@@ -192,22 +195,27 @@ public:
   bool guarded = false;
   int enters = 0;
   int leaves = 0;
+  QRect shape{0, 0, 100, 100};
+  QPoint enteredAt;
   bool isForegroundGameGuarded() const override
   {
     return guarded;
   }
   void getShape(int32_t &x, int32_t &y, int32_t &w, int32_t &h) const override
   {
-    x = y = 0;
-    w = h = 100;
+    x = shape.x();
+    y = shape.y();
+    w = shape.width();
+    h = shape.height();
   }
   void getCursorPos(int32_t &x, int32_t &y) const override
   {
     x = y = 50;
   }
-  void enter(int32_t, int32_t, uint32_t, KeyModifierMask, bool) override
+  void enter(int32_t x, int32_t y, uint32_t, KeyModifierMask, bool) override
   {
     ++enters;
+    enteredAt = QPoint(x, y);
   }
   bool leave() override
   {
@@ -336,6 +344,61 @@ void ServerTests::fullscreenGameGuard_preservesManualLock()
   test.manualLock(false);
   test.motion(true, 100, 50);
   QCOMPARE(test.remote->enters, 1);
+}
+
+void ServerTests::edgeMappingStaysInsideDestination_data()
+{
+  QTest::addColumn<int>("direction");
+  QTest::addColumn<int>("sourcePixel");
+  QTest::addColumn<float>("sourceStart");
+  QTest::addColumn<float>("sourceEnd");
+  QTest::addColumn<float>("destinationStart");
+  QTest::addColumn<float>("destinationEnd");
+  QTest::addColumn<int>("expectedPixel");
+  for (const auto direction : {Direction::Left, Direction::Right, Direction::Top, Direction::Bottom}) {
+    const auto name = QByteArray(deskflow::server::Config::dirName(direction));
+    QTest::newRow((name + "-narrow-upper-edge").constData())
+        << int(direction) << 32766 << 0.0f << 1.0f << 0.999f << 1.0f << 1079;
+    QTest::newRow((name + "-default-last-pixel").constData())
+        << int(direction) << 32766 << 0.0f << 1.0f << 0.0f << 1.0f << 1079;
+    QTest::newRow((name + "-default-midpoint").constData())
+        << int(direction) << 16383 << 0.0f << 1.0f << 0.0f << 1.0f << 540;
+    QTest::newRow((name + "-partial-edge").constData())
+        << int(direction) << 16383 << 0.25f << 0.75f << 0.25f << 0.75f << 540;
+    QTest::newRow((name + "-narrow-lower-edge").constData())
+        << int(direction) << 0 << 0.0f << 1.0f << 0.0f << 0.001f << 0;
+  }
+}
+
+void ServerTests::edgeMappingStaysInsideDestination()
+{
+  QFETCH(int, direction);
+  QFETCH(int, sourcePixel);
+  QFETCH(float, sourceStart);
+  QFETCH(float, sourceEnd);
+  QFETCH(float, destinationStart);
+  QFETCH(float, destinationEnd);
+  QFETCH(int, expectedPixel);
+  const auto side = static_cast<Direction>(direction);
+  const bool horizontal = side == Direction::Left || side == Direction::Right;
+  GuardServerFixture test;
+  test.primary.shape = QRect(0, 0, 32767, 32767);
+  test.remote->shape = QRect(-1920, -1080, 1080, 1080);
+  QVERIFY(test.config.disconnect("guard-primary", Direction::Right));
+  QVERIFY(test.config.connect(
+      "guard-primary", side, sourceStart, sourceEnd, "guard-remote", destinationStart, destinationEnd
+  ));
+
+  // Dispatch actual primary motion so Config edge transforms and Server's
+  // private fraction/pixel mapping run together, including the crossing axis.
+  const int crossingPixel = (side == Direction::Left || side == Direction::Top) ? 0 : 32766;
+  test.motion(true, horizontal ? crossingPixel : sourcePixel, horizontal ? sourcePixel : crossingPixel);
+  QCOMPARE(test.remote->enters, 1);
+  QVERIFY(test.remote->shape.contains(test.remote->enteredAt));
+  if (horizontal)
+    QCOMPARE(test.remote->enteredAt.y(), test.remote->shape.y() + expectedPixel);
+  else
+    QCOMPARE(test.remote->enteredAt.x(), test.remote->shape.x() + expectedPixel);
 }
 
 QTEST_MAIN(ServerTests)

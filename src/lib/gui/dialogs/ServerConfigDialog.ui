@@ -161,6 +161,27 @@
          </property>
         </widget>
        </item>
+       <item>
+        <layout class="QHBoxLayout" name="layoutScreenAlignment">
+         <item>
+          <widget class="QLabel" name="labelScreenAlignment">
+           <property name="text">
+            <string>Different screen sizes? Adjust where their edges meet.</string>
+           </property>
+           <property name="wordWrap">
+            <bool>true</bool>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QPushButton" name="btnScreenAlignment">
+           <property name="text">
+            <string>Screen alignment…</string>
+           </property>
+          </widget>
+         </item>
+        </layout>
+       </item>
       </layout>
      </widget>
      <widget class="QWidget" name="tabHotkeys">

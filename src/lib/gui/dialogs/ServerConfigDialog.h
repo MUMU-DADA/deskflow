@@ -36,6 +36,8 @@ public:
 
 protected:
   void onComputerRemoved();
+  void onComputersChanged();
+  void editScreenAlignment();
   void addClient();
   bool addComputer(const QString &clientName, bool doSilent);
 
@@ -92,6 +94,7 @@ private:
   void refreshControls();
   void initConnections() const;
   void updateControls() const;
+  void updateAlignmentButton() const;
   void restoreFromDefaults();
   void setServerConfig();
   bool isGeneralConfigModified() const;

@@ -16,6 +16,7 @@
 #include "dialogs/ActionDialog.h"
 #include "dialogs/ComputerSettingsDialog.h"
 #include "dialogs/HotkeyDialog.h"
+#include "dialogs/ScreenAlignmentDialog.h"
 #include "gui/widgets/SettingsDialogButtonBox.h"
 
 #include <QFileDialog>
@@ -49,6 +50,7 @@ ServerConfigDialog::ServerConfigDialog(QWidget *parent, ServerConfig &config)
   if (!deskflow::platform::isWindows())
     ui->cbWin32KeepForeground->setVisible(false);
   initConnections();
+  updateAlignmentButton();
 }
 
 ServerConfigDialog::~ServerConfigDialog() = default;
@@ -355,7 +357,40 @@ void ServerConfigDialog::addClient()
 void ServerConfigDialog::onComputerRemoved()
 {
   ui->lblNewComputer->setEnabled(true);
+  onComputersChanged();
+}
+
+void ServerConfigDialog::onComputersChanged()
+{
+  m_serverConfig.reconcileScreenAlignments();
+  updateAlignmentButton();
   setButtonBoxEnabledButtons();
+}
+
+void ServerConfigDialog::editScreenAlignment()
+{
+  if (!Settings::isWritable() || ui->groupExternalConfig->isChecked() || m_serverConfig.adjacentPairs().isEmpty())
+    return;
+  QString preferred = m_serverConfig.getServerName();
+  const auto index = ui->computerSetupView->currentIndex();
+  if (index.isValid() && !model().computer(index).isNull())
+    preferred = model().computer(index).name();
+  ScreenAlignmentDialog dialog(this, m_serverConfig, preferred);
+  if (dialog.exec() == QDialog::Accepted)
+    setButtonBoxEnabledButtons();
+}
+
+void ServerConfigDialog::updateAlignmentButton() const
+{
+  const bool hasPairs = !m_serverConfig.adjacentPairs().isEmpty();
+  const bool external = ui->groupExternalConfig->isChecked();
+  ui->btnScreenAlignment->setEnabled(Settings::isWritable() && !external && hasPairs);
+  ui->btnScreenAlignment->setToolTip(
+      external   ? tr("Screen alignment is controlled by the external server configuration.")
+      : hasPairs ? tr("Align adjacent computer desktops and limit crossing to their overlapping edges.\n"
+                      "Moving or renaming computers in the grid resets affected alignments.")
+                 : tr("Place two computers next to each other to align their screens.")
+  );
 }
 
 void ServerConfigDialog::toggleExternalConfig(bool checked)
@@ -364,6 +399,7 @@ void ServerConfigDialog::toggleExternalConfig(bool checked)
   ui->tabWidget->setTabEnabled(0, !checked);
   ui->tabWidget->setTabEnabled(1, !checked);
   serverConfig().setUseExternalConfig(checked);
+  updateAlignmentButton();
   setButtonBoxEnabledButtons();
 }
 
@@ -503,6 +539,7 @@ void ServerConfigDialog::initConnections() const
   connect(ui->cbRelativeMouseMoves, &QCheckBox::toggled, this, &ServerConfigDialog::toggleRelativeMouseMoves);
   connect(ui->cbEnableClipboard, &QCheckBox::toggled, this, &ServerConfigDialog::toggleClipboard);
   connect(ui->btnBrowseConfigFile, &QPushButton::clicked, this, &ServerConfigDialog::browseConfigFile);
+  connect(ui->btnScreenAlignment, &QPushButton::clicked, this, &ServerConfigDialog::editScreenAlignment);
   connect(ui->groupExternalConfig, &QGroupBox::toggled, this, &ServerConfigDialog::toggleExternalConfig);
   connect(ui->lineConfigFile, &QLineEdit::textChanged, this, &ServerConfigDialog::setServerConfig);
 
@@ -514,10 +551,7 @@ void ServerConfigDialog::initConnections() const
       ui->cbDefaultLockToComputerState, &QCheckBox::toggled, this, &ServerConfigDialog::toggleDefaultLockToComputerState
   );
   connect(ui->cbDisableLockToComputer, &QCheckBox::toggled, this, &ServerConfigDialog::toggleLockToComputer);
-  connect(
-      &m_computerSetupModel, &ComputerSetupModel::computersChanged, this,
-      &ServerConfigDialog::setButtonBoxEnabledButtons
-  );
+  connect(&m_computerSetupModel, &ComputerSetupModel::computersChanged, this, &ServerConfigDialog::onComputersChanged);
   connect(Settings::instance(), &Settings::settingsWritableChanged, this, &ServerConfigDialog::updateControls);
 }
 
@@ -538,6 +572,7 @@ void ServerConfigDialog::updateControls() const
   ui->sbSwitchDoubleTap->setEnabled(writable && ui->cbSwitchDoubleTap->isChecked());
   ui->sbSwitchDelay->setEnabled(writable && ui->cbSwitchDelay->isChecked());
   ui->groupExternalConfig->setEnabled(writable);
+  updateAlignmentButton();
   setButtonBoxEnabledButtons();
 }
 

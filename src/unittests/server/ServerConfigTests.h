@@ -18,4 +18,9 @@ private Q_SLOTS:
   void equalityCheck_diff_neighbours1();
   void equalityCheck_diff_neighbours2();
   void equalityCheck_diff_neighbours3();
+  void decimalIntervalsRoundTrip_data();
+  void decimalIntervalsRoundTrip();
+  void invalidIntervals_data();
+  void invalidIntervals();
+  void connectRejectsInvalidIntervals();
 };

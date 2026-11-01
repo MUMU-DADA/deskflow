@@ -16,6 +16,8 @@ private Q_SLOTS:
   void fullscreenGameGuard_activeDeviceOnlyAndExplicitSwitch();
   void fullscreenGameGuard_cancelsDelayedSwitch();
   void fullscreenGameGuard_preservesManualLock();
+  void edgeMappingStaysInsideDestination_data();
+  void edgeMappingStaysInsideDestination();
 
 private:
   Log m_log;

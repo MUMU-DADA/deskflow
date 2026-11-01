@@ -923,6 +923,174 @@ Inoltre, verifica di poter %1 il file di configurazione del server: %2</translat
     </message>
 </context>
 <context>
+    <name>ScreenAlignmentDialog</name>
+    <message>
+        <source>Screen alignment</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Connection:</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Use physical screen alignment for this connection</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Each rectangle represents one computer desktop. Measure the visible display area, excluding its frame. Individual monitors within a computer are not arranged here.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source> mm</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Width:</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Height:</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Swap width and height</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Align centers</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Restore whole edges</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Saved dimensions (editable).</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Local display estimate. Check the measurements.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Starting estimate. Remote dimensions are not detected.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>%1 → %2 (left to right)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>%1 → %2 (top to bottom)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Place two computers next to each other in the layout to align their screens.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Vertical offset:</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Horizontal offset:</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Positive moves the second screen down; negative moves it up.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Positive moves the second screen right; negative moves it left.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Align tops</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Align left edges</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Align bottoms</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Align right edges</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Manual dimensions.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Alignment is off. The whole edge of each computer connects to the whole edge of its neighbor.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>%1 right edge: %2 ↔ %3 left edge: %4
+Green sections allow crossing; the remaining edge is blocked.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>%1 bottom edge: %2 ↔ %3 top edge: %4
+Green sections allow crossing; the remaining edge is blocked.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>There is no usable crossing area for this alignment.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Saved values for %1 and %2 exceed this editor&apos;s range. Use Restore whole edges before recalibrating.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>%1 and %2 do not have a usable overlap. Adjust their offset or restore whole edges before saving.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Changes take effect after you also save Server Configuration.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Editable starting dimensions.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Computer layout changed</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Close Screen alignment and reopen it for the current layout.</source>
+        <translation type="unfinished"></translation>
+    </message>
+</context>
+<context>
+    <name>ScreenAlignmentPreview</name>
+    <message>
+        <source>Screen alignment preview</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Drag the second screen up or down. Arrow keys move it by 1 mm; Shift moves it by 10 mm.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Drag the second screen left or right. Arrow keys move it by 1 mm; Shift moves it by 10 mm.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Enter valid screen dimensions to preview the alignment.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>%1 × %2 mm</source>
+        <translation type="unfinished"></translation>
+    </message>
+</context>
+<context>
     <name>SearchWidget</name>
     <message>
         <source>Search</source>
@@ -1095,6 +1263,27 @@ L&apos;abilitazione di questa impostazione disabiliterà l&apos;interfaccia graf
     <message>
         <source>Enable lock to computer at startup</source>
         <translation type="unfinished">Abilita il blocco al computer all&apos;avvio</translation>
+    </message>
+    <message>
+        <source>Different screen sizes? Adjust where their edges meet.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Screen alignment…</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Screen alignment is controlled by the external server configuration.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Align adjacent computer desktops and limit crossing to their overlapping edges.
+Moving or renaming computers in the grid resets affected alignments.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Place two computers next to each other to align their screens.</source>
+        <translation type="unfinished"></translation>
     </message>
 </context>
 <context>

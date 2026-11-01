@@ -17,8 +17,10 @@
 #include "server/Server.h"
 
 #include <assert.h>
+#include <cmath>
 #include <cstdlib>
 #include <istream>
+#include <limits>
 #include <ostream>
 
 using namespace deskflow::string;
@@ -145,6 +147,13 @@ bool Config::connect(
 )
 {
   assert(srcSide >= Direction::FirstDirection && srcSide <= Direction::LastDirection);
+
+  const auto validInterval = [](float start, float end) {
+    return std::isfinite(start) && std::isfinite(end) && start >= 0.0f && end <= 1.0f && start < end;
+  };
+  if (!validInterval(srcStart, srcEnd) || !validInterval(dstStart, dstEnd)) {
+    return false;
+  }
 
   // find source cell
   CellMap::iterator index = m_map.find(getCanonicalName(srcName));
@@ -485,7 +494,13 @@ std::string Config::formatInterval(const Interval &x)
   if (x.first == 0.0f && x.second == 1.0f) {
     return "";
   }
-  return deskflow::string::sprintf("(%d,%d)", (int)(x.first * 100.0f + 0.5f), (int)(x.second * 100.0f + 0.5f));
+  // Keep enough significant digits to recover the stored float endpoints after
+  // converting percentages back to fractions. Do the scaling in double so it
+  // does not discard precision before formatting. QString uses the C locale.
+  const auto percentage = [](float value) {
+    return QString::number(static_cast<double>(value) * 100.0, 'g', std::numeric_limits<float>::max_digits10);
+  };
+  return QStringLiteral("(%1,%2)").arg(percentage(x.first), percentage(x.second)).toStdString();
 }
 
 void Config::readSection(ConfigReadContext &s)
@@ -1346,22 +1361,22 @@ Config::Interval ConfigReadContext::parseInterval(const ArgList &args) const
     throw ServerConfigReadException(*this, "invalid interval \"%{1}\"", concatArgs(args));
   }
 
-  char *end;
-  double startValue = strtod(args[0].c_str(), &end);
-  if (end[0] != '\0') {
-    throw ServerConfigReadException(*this, "invalid interval \"%{1}\"", concatArgs(args));
-  }
-  double endValue = strtod(args[1].c_str(), &end);
-  if (end[0] != '\0') {
-    throw ServerConfigReadException(*this, "invalid interval \"%{1}\"", concatArgs(args));
-  }
-
-  if (startValue < 0 || startValue > 100 || endValue < 0 || endValue > 100 || startValue >= endValue) {
+  bool startValid = false;
+  bool endValid = false;
+  const double startValue = QString::fromStdString(args[0]).toDouble(&startValid);
+  const double endValue = QString::fromStdString(args[1]).toDouble(&endValid);
+  if (!startValid || !endValid || !std::isfinite(startValue) || !std::isfinite(endValue) || startValue < 0 ||
+      startValue > 100 || endValue < 0 || endValue > 100 || startValue >= endValue) {
     throw ServerConfigReadException(*this, "invalid interval \"%{1}\"", concatArgs(args));
   }
 
   auto startInterval = static_cast<float>(startValue / 100.0f);
   auto endInterval = static_cast<float>(endValue / 100.0f);
+  // Distinct decimal endpoints can collapse to the same stored float. Such a
+  // link has no usable extent and would divide by zero during edge mapping.
+  if (startInterval >= endInterval) {
+    throw ServerConfigReadException(*this, "invalid interval \"%{1}\"", concatArgs(args));
+  }
   return Config::Interval(startInterval, endInterval);
 }
 

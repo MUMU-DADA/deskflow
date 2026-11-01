@@ -925,6 +925,176 @@ Additionally, check you are able to %1 the server config file: %2</source>
     </message>
 </context>
 <context>
+    <name>ScreenAlignmentDialog</name>
+    <message>
+        <source>Screen alignment</source>
+        <translation>屏幕对齐</translation>
+    </message>
+    <message>
+        <source>Connection:</source>
+        <translation>相邻电脑：</translation>
+    </message>
+    <message>
+        <source>Use physical screen alignment for this connection</source>
+        <translation>按物理尺寸对齐这两台电脑</translation>
+    </message>
+    <message>
+        <source>Each rectangle represents one computer desktop. Measure the visible display area, excluding its frame. Individual monitors within a computer are not arranged here.</source>
+        <translation>每个矩形代表一台电脑的完整桌面。请填写可视区域的尺寸（不含边框）。此处不调整同一台电脑内部的多个显示器。</translation>
+    </message>
+    <message>
+        <source> mm</source>
+        <translation> 毫米</translation>
+    </message>
+    <message>
+        <source>Width:</source>
+        <translation>宽度：</translation>
+    </message>
+    <message>
+        <source>Height:</source>
+        <translation>高度：</translation>
+    </message>
+    <message>
+        <source>Swap width and height</source>
+        <translation>交换宽高</translation>
+    </message>
+    <message>
+        <source>Align centers</source>
+        <translation>居中对齐</translation>
+    </message>
+    <message>
+        <source>Restore whole edges</source>
+        <translation>恢复整条边缘连接</translation>
+    </message>
+    <message>
+        <source>Saved dimensions (editable).</source>
+        <translation>已保存的尺寸，可继续调整。</translation>
+    </message>
+    <message>
+        <source>Local display estimate. Check the measurements.</source>
+        <translation>本机显示器估算值，请核对实际尺寸。</translation>
+    </message>
+    <message>
+        <source>Starting estimate. Remote dimensions are not detected.</source>
+        <translation>初始估算值，尚未检测远端尺寸。</translation>
+    </message>
+    <message>
+        <source>%1 → %2 (left to right)</source>
+        <translation>%1 → %2（从左到右）</translation>
+    </message>
+    <message>
+        <source>%1 → %2 (top to bottom)</source>
+        <translation>%1 → %2（从上到下）</translation>
+    </message>
+    <message>
+        <source>Place two computers next to each other in the layout to align their screens.</source>
+        <translation>先在布局中将两台电脑相邻放置，再设置屏幕对齐。</translation>
+    </message>
+    <message>
+        <source>Vertical offset:</source>
+        <translation>上下偏移：</translation>
+    </message>
+    <message>
+        <source>Horizontal offset:</source>
+        <translation>左右偏移：</translation>
+    </message>
+    <message>
+        <source>Positive moves the second screen down; negative moves it up.</source>
+        <translation>正值向下移动第二块屏幕，负值向上移动。</translation>
+    </message>
+    <message>
+        <source>Positive moves the second screen right; negative moves it left.</source>
+        <translation>正值向右移动第二块屏幕，负值向左移动。</translation>
+    </message>
+    <message>
+        <source>Align tops</source>
+        <translation>顶端对齐</translation>
+    </message>
+    <message>
+        <source>Align left edges</source>
+        <translation>左边对齐</translation>
+    </message>
+    <message>
+        <source>Align bottoms</source>
+        <translation>底端对齐</translation>
+    </message>
+    <message>
+        <source>Align right edges</source>
+        <translation>右边对齐</translation>
+    </message>
+    <message>
+        <source>Manual dimensions.</source>
+        <translation>手动设置的尺寸。</translation>
+    </message>
+    <message>
+        <source>Alignment is off. The whole edge of each computer connects to the whole edge of its neighbor.</source>
+        <translation>物理对齐未启用：两台电脑仍使用整条边缘互相映射。</translation>
+    </message>
+    <message>
+        <source>%1 right edge: %2 ↔ %3 left edge: %4
+Green sections allow crossing; the remaining edge is blocked.</source>
+        <translation>%1 右边缘：%2 ↔ %3 左边缘：%4
+绿色区域可以跨屏，其余边缘不能跨越。</translation>
+    </message>
+    <message>
+        <source>%1 bottom edge: %2 ↔ %3 top edge: %4
+Green sections allow crossing; the remaining edge is blocked.</source>
+        <translation>%1 下边缘：%2 ↔ %3 上边缘：%4
+绿色区域可以跨屏，其余边缘不能跨越。</translation>
+    </message>
+    <message>
+        <source>There is no usable crossing area for this alignment.</source>
+        <translation>当前两屏没有可跨越的重叠区域。</translation>
+    </message>
+    <message>
+        <source>Saved values for %1 and %2 exceed this editor&apos;s range. Use Restore whole edges before recalibrating.</source>
+        <translation>%1 与 %2 已保存的数值超出编辑范围。请先恢复整条边缘连接，再重新校准。</translation>
+    </message>
+    <message>
+        <source>%1 and %2 do not have a usable overlap. Adjust their offset or restore whole edges before saving.</source>
+        <translation>%1 与 %2 没有可用的重叠区域。请调整偏移，或恢复整条边缘连接后再保存。</translation>
+    </message>
+    <message>
+        <source>Changes take effect after you also save Server Configuration.</source>
+        <translation>完成后还需保存“服务器配置”，更改才会生效。</translation>
+    </message>
+    <message>
+        <source>Editable starting dimensions.</source>
+        <translation>可调整的初始尺寸。</translation>
+    </message>
+    <message>
+        <source>Computer layout changed</source>
+        <translation>电脑布局已更改</translation>
+    </message>
+    <message>
+        <source>Close Screen alignment and reopen it for the current layout.</source>
+        <translation>请关闭并重新打开“屏幕对齐”，以使用当前布局。</translation>
+    </message>
+</context>
+<context>
+    <name>ScreenAlignmentPreview</name>
+    <message>
+        <source>Screen alignment preview</source>
+        <translation>屏幕对齐预览</translation>
+    </message>
+    <message>
+        <source>Drag the second screen up or down. Arrow keys move it by 1 mm; Shift moves it by 10 mm.</source>
+        <translation>拖动第二块屏幕调整上下位置。方向键每次移动 1 毫米，按住 Shift 移动 10 毫米。</translation>
+    </message>
+    <message>
+        <source>Drag the second screen left or right. Arrow keys move it by 1 mm; Shift moves it by 10 mm.</source>
+        <translation>拖动第二块屏幕调整左右位置。方向键每次移动 1 毫米，按住 Shift 移动 10 毫米。</translation>
+    </message>
+    <message>
+        <source>Enter valid screen dimensions to preview the alignment.</source>
+        <translation>请输入有效的屏幕尺寸以预览对齐效果。</translation>
+    </message>
+    <message>
+        <source>%1 × %2 mm</source>
+        <translation>%1 × %2 毫米</translation>
+    </message>
+</context>
+<context>
     <name>SearchWidget</name>
     <message>
         <source>Search</source>
@@ -1097,6 +1267,28 @@ Enabling this setting will disable the server config GUI.</source>
     <message>
         <source>Enable lock to computer at startup</source>
         <translation type="unfinished">启动时启用锁定到计算机</translation>
+    </message>
+    <message>
+        <source>Different screen sizes? Adjust where their edges meet.</source>
+        <translation>屏幕尺寸不同？可以调整两屏的接壤位置。</translation>
+    </message>
+    <message>
+        <source>Screen alignment…</source>
+        <translation>屏幕对齐…</translation>
+    </message>
+    <message>
+        <source>Screen alignment is controlled by the external server configuration.</source>
+        <translation>当前屏幕对齐由外部服务器配置文件控制。</translation>
+    </message>
+    <message>
+        <source>Place two computers next to each other to align their screens.</source>
+        <translation>先将两台电脑相邻放置，再设置屏幕对齐。</translation>
+    </message>
+    <message>
+        <source>Align adjacent computer desktops and limit crossing to their overlapping edges.
+Moving or renaming computers in the grid resets affected alignments.</source>
+        <translation>对齐相邻电脑的桌面，只允许从重叠的边缘区域跨屏。
+在网格中移动电脑或更改电脑名称，会重置受影响的对齐设置。</translation>
     </message>
 </context>
 <context>
