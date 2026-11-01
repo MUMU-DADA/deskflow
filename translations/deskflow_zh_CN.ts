@@ -1212,11 +1212,27 @@ Second-screen offset: %3% of the first edge. No millimeter measurement is requir
     </message>
     <message>
         <source>Edge markers currently require one display per computer. Display changes cancel calibration.</source>
-        <translation>边缘标记目前要求每台电脑各接一块屏幕。显示设置改变时会取消校准。</translation>
+        <translation type="vanished">边缘标记目前要求每台电脑各接一块屏幕。显示设置改变时会取消校准。</translation>
     </message>
     <message>
         <source>Calibration stopped because a computer or its display is no longer available. Your previous alignment has been kept.</source>
         <translation>电脑或显示器已不可用，校准停止。原来的对齐设置已保留。</translation>
+    </message>
+    <message>
+        <source>Edge markers currently require one display per computer. Use manual alignment for other layouts.</source>
+        <translation>边缘标记目前要求每台电脑各接一块屏幕，其他布局请使用手填尺寸对齐。</translation>
+    </message>
+    <message>
+        <source>A display&apos;s resolution, rotation or scaling changed. Start calibration again.</source>
+        <translation>显示器的分辨率、旋转或缩放已改变，请重新开始校准。</translation>
+    </message>
+    <message>
+        <source>The system moved an edge marker away from its calibrated position. Retry, or use manual alignment.</source>
+        <translation>系统移动了边缘标记，导致位置不准确。请重试，或使用手填尺寸对齐。</translation>
+    </message>
+    <message>
+        <source>The edge markers could not be placed accurately. Retry, or use manual alignment.</source>
+        <translation>无法准确放置边缘标记。请重试，或使用手填尺寸对齐。</translation>
     </message>
 </context>
 <context>

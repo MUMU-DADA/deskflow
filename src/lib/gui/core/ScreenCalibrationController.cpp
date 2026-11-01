@@ -8,6 +8,7 @@
 #include "gui/widgets/ScreenCalibrationOverlay.h"
 
 #include <QApplication>
+#include <QDebug>
 #include <QJsonArray>
 #include <QScreen>
 #include <QUuid>
@@ -359,8 +360,14 @@ QString ScreenCalibrationController::errorText(const QString &reason)
     return tr("Calibration was cancelled. Your previous alignment has been kept.");
   if (reason == "wayland")
     return tr("This Wayland session cannot position edge markers precisely. Use manual screen alignment here.");
-  if (reason == "multiple_displays" || reason == "display_changed")
-    return tr("Edge markers currently require one display per computer. Display changes cancel calibration.");
+  if (reason == "multiple_displays")
+    return tr("Edge markers currently require one display per computer. Use manual alignment for other layouts.");
+  if (reason == "display_changed")
+    return tr("A display's resolution, rotation or scaling changed. Start calibration again.");
+  if (reason == "marker_repositioned")
+    return tr("The system moved an edge marker away from its calibrated position. Retry, or use manual alignment.");
+  if (reason == "marker_unavailable" || reason == "invalid_positions")
+    return tr("The edge markers could not be placed accurately. Retry, or use manual alignment.");
   return tr(
       "Calibration stopped because a computer or its display is no longer available. Your previous alignment has been "
       "kept."
@@ -411,6 +418,10 @@ void ScreenCalibrationController::showLocal(const QJsonObject &message)
   }
   if (!m_overlay) {
     m_overlay = new ScreenCalibrationOverlay(parent);
+    connect(
+        m_overlay.data(), &ScreenCalibrationOverlay::placementReady, this,
+        &ScreenCalibrationController::reportLocalReady
+    );
     connect(m_overlay.data(), &ScreenCalibrationOverlay::pointMoved, this, [this](int index, double position) {
       if (index < 0 || index >= m_localPoints.size())
         return;
@@ -426,8 +437,10 @@ void ScreenCalibrationController::showLocal(const QJsonObject &message)
       replyLocal("cancel", {{"reason", "user_cancelled"}});
       stopLocal();
     });
-    connect(m_overlay.data(), &ScreenCalibrationOverlay::invalidated, this, [this](const QString &) {
-      replyLocal("cancel", {{"reason", "display_changed"}});
+    connect(m_overlay.data(), &ScreenCalibrationOverlay::invalidated, this, [this](const QString &reason) {
+      const auto code = m_overlay ? m_overlay->failureCode() : QStringLiteral("marker_unavailable");
+      qWarning().noquote() << "Screen calibration stopped:" << code << reason;
+      replyLocal("error", {{"reason", code}, {"detail", reason}});
       stopLocal();
     });
   }
@@ -444,16 +457,32 @@ void ScreenCalibrationController::showLocal(const QJsonObject &message)
     m_overlay->setPositions(visiblePoints);
   else
     problem = m_overlay->showForEdge(*edge, visiblePoints);
-  if (!problem.isEmpty() || !m_overlay || !m_overlay->isRunning()) {
-    fail(
-        QGuiApplication::platformName().startsWith("wayland") ? "wayland"
-        : QGuiApplication::screens().size() != 1              ? "multiple_displays"
-                                                              : "ui_unavailable"
-    );
+  if (!m_overlay) // The invalidated callback already reported the exact failure.
+    return;
+  if (!problem.isEmpty() || !m_overlay->isRunning()) {
+    const auto code = QGuiApplication::platformName().startsWith("wayland") ? QStringLiteral("wayland")
+                      : QGuiApplication::screens().size() != 1              ? QStringLiteral("multiple_displays")
+                                                                            : m_overlay->failureCode();
+    qWarning().noquote() << "Screen calibration could not start:" << code << problem;
+    replyLocal("error", {{"reason", code}, {"detail", problem}});
     stopLocal();
     return;
   }
   m_localLease.start();
+  // Native creation can reposition a tool window. Wait for verification of the
+  // post-show geometry before reporting coordinates as ready.
+}
+
+void ScreenCalibrationController::reportLocalReady()
+{
+  if (!m_overlay || !m_overlay->isRunning() || !m_overlay->isPlacementReady() || m_localSession.isEmpty())
+    return;
+  const auto *screen = QGuiApplication::primaryScreen();
+  if (!screen || QGuiApplication::screens().size() != 1) {
+    replyLocal("error", {{"reason", "display_changed"}});
+    stopLocal();
+    return;
+  }
   const auto rendered = m_overlay->positions();
   for (int i = 0; i < rendered.size() && i < m_localPoints.size(); ++i)
     m_localPoints[i] = rendered[i];
@@ -466,7 +495,7 @@ void ScreenCalibrationController::showLocal(const QJsonObject &message)
                  QJsonObject{
                      {"width", geometry.width()},
                      {"height", geometry.height()},
-                     {"dpr", QGuiApplication::primaryScreen()->devicePixelRatio()},
+                     {"dpr", screen->devicePixelRatio()},
                      {"screenCount", 1}
                  }}}
   );

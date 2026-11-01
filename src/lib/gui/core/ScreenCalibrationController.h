@@ -77,6 +77,7 @@ private:
   void showEndpoints();
   void updateOwner(const QJsonObject &message);
   void showLocal(const QJsonObject &message);
+  void reportLocalReady();
   void sendLocalPoints();
   void stopLocal();
   void abortSession(const QString &reason);

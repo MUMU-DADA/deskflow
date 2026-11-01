@@ -32,6 +32,21 @@ set_target_properties(ScreenCalibrationOverlayTests PROPERTIES
   RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/calibration-overlay"
 )
 
+# This deliberately uses Cocoa even when the remaining suite uses offscreen:
+# native first-show frame conversion is the behavior under test.
+if(APPLE)
+  create_test(
+    NAME ScreenCalibrationNativeSmoke
+    DEPENDS gui
+    SOURCE ScreenCalibrationNativeSmoke.cpp
+    WORKING_DIRECTORY "${CMAKE_BINARY_DIR}/src/lib/gui"
+  )
+  set_tests_properties(ScreenCalibrationNativeSmoke PROPERTIES
+    SKIP_RETURN_CODE 77
+    TIMEOUT 10
+  )
+endif()
+
 create_test(
   NAME ScreenCalibrationTests
   DEPENDS gui

@@ -24,6 +24,31 @@
 using Overlay = ScreenCalibrationOverlay;
 using Edge = Overlay::Edge;
 
+namespace {
+class InitialShowDisplacement : public QObject
+{
+public:
+  explicit InitialShowDisplacement(QPoint displacement) : m_displacement(displacement)
+  {
+  }
+  bool applied = false;
+
+protected:
+  bool eventFilter(QObject *object, QEvent *event) override
+  {
+    if (!applied && event->type() == QEvent::Show) {
+      applied = true;
+      auto *widget = qobject_cast<QWidget *>(object);
+      widget->setGeometry(widget->geometry().translated(m_displacement));
+    }
+    return false;
+  }
+
+private:
+  QPoint m_displacement;
+};
+} // namespace
+
 void ScreenCalibrationOverlayTests::geometry_data()
 {
   QTest::addColumn<int>("edgeValue");
@@ -218,6 +243,87 @@ void ScreenCalibrationOverlayTests::interruptedDragEndsOnce()
   QCOMPARE(dragging.count(), 4);
   QCOMPARE(dragging.at(2).at(0).toBool(), true);
   QCOMPARE(dragging.at(3).at(0).toBool(), false);
+}
+
+void ScreenCalibrationOverlayTests::initialShowDisplacementIsCorrected_data()
+{
+  QTest::addColumn<QPoint>("displacement");
+  QTest::newRow("observed-cocoa-offset") << QPoint(0, -20);
+  QTest::newRow("different-offset") << QPoint(13, 37);
+}
+
+void ScreenCalibrationOverlayTests::initialShowDisplacementIsCorrected()
+{
+  QFETCH(QPoint, displacement);
+  QCOMPARE(QGuiApplication::platformName(), QStringLiteral("offscreen"));
+  Overlay overlay;
+  // Private session setup exercises real QWidget show events in the offscreen
+  // plugin. The public showForEdge still rejects that unsupported platform.
+  overlay.m_running = true;
+  overlay.m_screenGeometry = QRect(0, 0, 1440, 2560);
+  overlay.m_edge = Edge::Left;
+  InitialShowDisplacement shift(displacement);
+  overlay.pointWidget(0)->installEventFilter(&shift);
+  QSignalSpy ready(&overlay, &Overlay::placementReady);
+  overlay.setPositions({0.25, 0.75});
+  QVERIFY(shift.applied);
+  QVERIFY(!overlay.isPlacementReady());
+  for (int i = 0; i < 2; ++i) {
+    const auto expected = Overlay::markerGeometryFor(Edge::Left, overlay.screenGeometry(), i == 0 ? 0.25 : 0.75);
+    QCOMPARE(overlay.pointWidget(i)->geometry(), expected);
+    QCOMPARE(overlay.positions()[i], Overlay::normalizedPositionFor(Edge::Left, overlay.screenGeometry(), expected));
+  }
+  QVERIFY(ready.wait(1000));
+  QVERIFY(overlay.isPlacementReady());
+  QCOMPARE(ready.count(), 1);
+  QVERIFY(overlay.failureCode().isEmpty());
+}
+
+void ScreenCalibrationOverlayTests::placementReadinessRejectsStaleGenerations()
+{
+  Overlay overlay;
+  overlay.m_running = true;
+  overlay.m_screenGeometry = QRect(0, 0, 1920, 1080);
+  QSignalSpy ready(&overlay, &Overlay::placementReady);
+  overlay.setPositions({0.25, 0.75});
+  const auto firstGeneration = overlay.m_generation;
+  overlay.setPositions({0.3, 0.8});
+  overlay.verifyPlacement(firstGeneration);
+  QVERIFY(!overlay.isPlacementReady());
+  QCOMPARE(ready.count(), 0);
+  QVERIFY(ready.wait(1000));
+  QCOMPARE(ready.count(), 1);
+  QVERIFY(overlay.isPlacementReady());
+  overlay.verifyPlacement(overlay.m_generation);
+  QCOMPARE(ready.count(), 1); // Exactly one ready per placement generation.
+
+  overlay.setPositions({0.2, 0.7});
+  QVERIFY(!overlay.isPlacementReady());
+  const auto pendingGeneration = overlay.m_generation;
+  overlay.stop();
+  overlay.verifyPlacement(pendingGeneration);
+  QTest::qWait(150);
+  QCOMPARE(ready.count(), 1);
+  QVERIFY(!overlay.isPlacementReady());
+}
+
+void ScreenCalibrationOverlayTests::displacedMarkerFailsStrictVerification()
+{
+  Overlay overlay;
+  overlay.m_running = true;
+  overlay.m_screenGeometry = QRect(0, 0, 1920, 1080);
+  QSignalSpy ready(&overlay, &Overlay::placementReady);
+  QSignalSpy failed(&overlay, &Overlay::invalidated);
+  overlay.setPositions({0.25, 0.75});
+  auto *marker = overlay.pointWidget(0);
+  marker->setGeometry(marker->geometry().translated(0, 1));
+  QVERIFY(failed.wait(1000));
+  QCOMPARE(overlay.failureCode(), QStringLiteral("marker_repositioned"));
+  QVERIFY(failed.first().first().toString().contains("window manager moved"));
+  QCOMPARE(ready.count(), 0);
+  QVERIFY(!overlay.isPlacementReady());
+  QVERIFY(!overlay.isRunning());
+  QVERIFY(!marker->isVisible());
 }
 
 void ScreenCalibrationOverlayTests::relativePreviewIsReadOnly()

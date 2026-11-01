@@ -7,6 +7,7 @@
 
 #include <QApplication>
 #include <QCloseEvent>
+#include <QDebug>
 #include <QGuiApplication>
 #include <QKeyEvent>
 #include <QMouseEvent>
@@ -322,10 +323,13 @@ QString ScreenCalibrationOverlay::showForEdge(Edge edge, const QList<double> &po
 {
   if (m_running)
     return tr("Screen calibration is already active.");
+  m_failureCode = QStringLiteral("marker_unavailable");
   if (const auto reason = unavailableReason(); !reason.isEmpty())
     return reason;
-  if (!validEdge(edge) || !validPositions(positions))
+  if (!validEdge(edge) || !validPositions(positions)) {
+    m_failureCode = QStringLiteral("invalid_positions");
     return tr("The screen-edge marker positions are invalid.");
+  }
   if (auto *modal = QApplication::activeModalWidget();
       modal && (!m_owner || (modal != m_owner.data() && !modal->isAncestorOf(m_owner.data()))))
     return tr("Close the other dialog on this computer before starting screen calibration.");
@@ -338,9 +342,11 @@ QString ScreenCalibrationOverlay::showForEdge(Edge edge, const QList<double> &po
   m_edge = edge;
   m_positions = positions;
   m_running = true;
+  m_placementReady = false;
+  m_failureCode.clear();
   ++m_generation;
   const auto changed = [this] {
-    invalidate(tr("The display layout or scaling changed. Start screen calibration again."));
+    invalidate("display_changed", tr("The display layout or scaling changed. Start screen calibration again."));
   };
   m_screenConnections = {
       connect(qGuiApp, &QGuiApplication::screenAdded, this, changed),
@@ -353,8 +359,7 @@ QString ScreenCalibrationOverlay::showForEdge(Edge edge, const QList<double> &po
   qApp->installEventFilter(this);
   if (!placeMarkers())
     return tr("The calibration markers could not be displayed. Use manual dimensions instead.");
-  const auto generation = m_generation;
-  QTimer::singleShot(100, this, [this, generation] { verifyPlacement(generation); });
+  schedulePlacementVerification();
   return {};
 }
 
@@ -362,8 +367,10 @@ void ScreenCalibrationOverlay::setPositions(const QList<double> &positions)
 {
   if (!m_running)
     return;
+  m_placementReady = false;
+  ++m_generation;
   if (!validPositions(positions)) {
-    invalidate(tr("The screen-edge marker positions are invalid."));
+    invalidate("invalid_positions", tr("The screen-edge marker positions are invalid."));
     return;
   }
   auto updated = positions;
@@ -374,13 +381,16 @@ void ScreenCalibrationOverlay::setPositions(const QList<double> &positions)
   if (m_dragPoint >= 0 && m_dragPoint < updated.size())
     updated[m_dragPoint] = m_positions[m_dragPoint];
   m_positions = updated;
-  placeMarkers();
+  if (placeMarkers())
+    schedulePlacementVerification();
 }
 
 bool ScreenCalibrationOverlay::placeMarkers()
 {
   m_requestedGeometry.clear();
   for (int i = 0; i < static_cast<int>(m_markers.size()); ++i) {
+    if (!m_running)
+      return false;
     auto *marker = m_markers[i];
     if (i >= m_positions.size()) {
       marker->hide();
@@ -388,23 +398,36 @@ bool ScreenCalibrationOverlay::placeMarkers()
     }
     marker->setEdge(m_edge);
     const auto requested = markerGeometryFor(m_edge, m_screenGeometry, m_positions[i]);
-    marker->setGeometry(requested);
     m_requestedGeometry.append(requested);
-    // Report the arrow's actual pixel-centered tip after rounding/clamping,
-    // never the unclamped requested endpoint. No global-coordinate DPR math.
-    m_positions[i] = normalizedPositionFor(m_edge, m_screenGeometry, marker->geometry());
     if (!marker->isVisible()) {
+      // Cocoa resolves its native tool-window style/frame during creation and
+      // first show. Applying edge coordinates beforehand can leave a displaced
+      // window, particularly on portrait displays. Position only after show.
       marker->show();
+      if (!m_running)
+        return false;
       marker->raise();
 #if defined(Q_OS_MACOS)
-      if (!raiseOSXScreenCalibrationMarker(marker)) {
-        invalidate(tr("The calibration markers could not be displayed. Use manual dimensions instead."));
+      if (QGuiApplication::platformName() == "cocoa" && !raiseOSXScreenCalibrationMarker(marker)) {
+        invalidate(
+            "marker_unavailable", tr("The calibration markers could not be displayed. Use manual dimensions instead.")
+        );
         return false;
       }
 #endif
     }
+    marker->setGeometry(requested);
+    // Report the actual post-native-show, pixel-centered tip after rounding
+    // and clamping. No pre-show geometry or global-coordinate DPR math.
+    m_positions[i] = normalizedPositionFor(m_edge, m_screenGeometry, marker->geometry());
   }
   return true;
+}
+
+void ScreenCalibrationOverlay::schedulePlacementVerification()
+{
+  const auto generation = m_generation;
+  QTimer::singleShot(100, this, [this, generation] { verifyPlacement(generation); });
 }
 
 void ScreenCalibrationOverlay::verifyPlacement(quint64 generation)
@@ -413,9 +436,17 @@ void ScreenCalibrationOverlay::verifyPlacement(quint64 generation)
     return;
   for (int i = 0; i < m_positions.size(); ++i) {
     if (m_markers[i]->geometry() != m_requestedGeometry[i]) {
-      invalidate(tr("The window manager moved a calibration marker away from the requested screen edge."));
+      invalidate(
+          "marker_repositioned",
+          tr("The window manager moved a calibration marker away from the requested screen edge.")
+      );
       return;
     }
+    m_positions[i] = normalizedPositionFor(m_edge, m_screenGeometry, m_markers[i]->geometry());
+  }
+  if (!m_placementReady) {
+    m_placementReady = true;
+    Q_EMIT placementReady();
   }
 }
 
@@ -438,6 +469,11 @@ void ScreenCalibrationOverlay::movePoint(int point, const QPointF &delta)
   m_positions[point] = std::clamp(m_startPosition + displacement / extent, 0.0, 1.0);
   if (!placeMarkers())
     return;
+  if (m_placementReady) {
+    verifyPlacement(m_generation);
+    if (!m_running)
+      return;
+  }
   if (m_positions[point] != previous)
     Q_EMIT pointMoved(point, m_positions[point]);
 }
@@ -458,10 +494,20 @@ void ScreenCalibrationOverlay::requestCancel()
   Q_EMIT cancelRequested();
 }
 
-void ScreenCalibrationOverlay::invalidate(const QString &reason)
+void ScreenCalibrationOverlay::invalidate(const QString &code, const QString &reason)
 {
   if (!m_running)
     return;
+  m_failureCode = code;
+  QList<QRect> actual;
+  QList<QRect> frames;
+  for (int i = 0; i < m_positions.size(); ++i) {
+    actual.append(m_markers[i]->geometry());
+    frames.append(m_markers[i]->frameGeometry());
+  }
+  qWarning().noquote() << "Screen calibration invalidated:" << code << reason << "edge" << static_cast<int>(m_edge)
+                       << "requested" << m_requestedGeometry << "actual" << actual << "frames" << frames << "screen"
+                       << m_screenGeometry << "dpr" << (m_screen ? m_screen->devicePixelRatio() : 0);
   stop();
   Q_EMIT invalidated(reason);
 }
@@ -470,6 +516,7 @@ void ScreenCalibrationOverlay::stop()
 {
   const bool dragged = m_dragPoint >= 0;
   m_running = false;
+  m_placementReady = false;
   m_dragPoint = -1;
   ++m_generation;
   if (qApp)
@@ -493,6 +540,16 @@ QList<double> ScreenCalibrationOverlay::positions() const
 bool ScreenCalibrationOverlay::isRunning() const
 {
   return m_running;
+}
+
+bool ScreenCalibrationOverlay::isPlacementReady() const
+{
+  return m_placementReady;
+}
+
+QString ScreenCalibrationOverlay::failureCode() const
+{
+  return m_failureCode;
 }
 
 QRect ScreenCalibrationOverlay::screenGeometry() const

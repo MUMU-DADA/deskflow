@@ -52,18 +52,22 @@ public:
   static QRect markerGeometryFor(Edge edge, const QRect &screen, double position);
   static double normalizedPositionFor(Edge edge, const QRect &screen, const QRect &marker);
 
-  // Empty string means success. Coordinates are fractions of the complete
-  // screen edge, in top-to-bottom or left-to-right order, never work-area units.
+  // Empty string means creation started; wait for placementReady before using
+  // the positions. Coordinates are fractions of the complete screen edge, in
+  // top-to-bottom or left-to-right order, never work-area units.
   QString showForEdge(Edge edge, const QList<double> &positions);
   void setPositions(const QList<double> &positions);
   QList<double> positions() const;
   void stop();
   bool isRunning() const;
+  bool isPlacementReady() const;
+  QString failureCode() const;
   QRect screenGeometry() const;
   double aspectRatio() const;
   QWidget *pointWidget(int point) const;
 
 Q_SIGNALS:
+  void placementReady();
   void pointMoved(int point, double position);
   void dragStateChanged(bool dragging);
   void cancelRequested();
@@ -78,12 +82,13 @@ private:
   friend class ScreenCalibrationOverlayTests;
 
   bool placeMarkers();
+  void schedulePlacementVerification();
   void verifyPlacement(quint64 generation);
   void beginDrag(int point);
   void movePoint(int point, const QPointF &delta);
   void endDrag(int point);
   void requestCancel();
-  void invalidate(const QString &reason);
+  void invalidate(const QString &code, const QString &reason);
 
   QPointer<QWidget> m_owner;
   QPointer<QScreen> m_screen;
@@ -94,6 +99,8 @@ private:
   QRect m_screenGeometry;
   Edge m_edge = Edge::Right;
   bool m_running = false;
+  bool m_placementReady = false;
+  QString m_failureCode;
   int m_dragPoint = -1;
   double m_startPosition = 0;
   quint64 m_generation = 0;

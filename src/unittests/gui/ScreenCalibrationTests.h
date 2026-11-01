@@ -21,6 +21,7 @@ private Q_SLOTS:
   void checkPointDoesNotRefit();
   void geometryChangesAbort();
   void timeoutErrorAndRetry();
+  void placementErrorsHaveDistinctFeedback();
   void wizardAcceptAndCancel();
   void wizardFailureAndRetry();
   void failedWizardCannotCancelAnotherSession();

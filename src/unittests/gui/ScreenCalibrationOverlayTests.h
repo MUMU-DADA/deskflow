@@ -21,6 +21,10 @@ private Q_SLOTS:
   void independentOverlayDestructionIsSafe();
   void interruptedDragEndsOnce_data();
   void interruptedDragEndsOnce();
+  void initialShowDisplacementIsCorrected_data();
+  void initialShowDisplacementIsCorrected();
+  void placementReadinessRejectsStaleGenerations();
+  void displacedMarkerFailsStrictVerification();
   void relativePreviewIsReadOnly();
   void renderExamples();
 };

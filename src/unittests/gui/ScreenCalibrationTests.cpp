@@ -315,6 +315,35 @@ void ScreenCalibrationTests::timeoutErrorAndRetry()
   QVERIFY(session.start());
 }
 
+void ScreenCalibrationTests::placementErrorsHaveDistinctFeedback()
+{
+  Session session;
+  QSignalSpy cancelled(&session.controller, &ScreenCalibrationController::cancelled);
+  QVERIFY(session.start());
+  session.readyBoth();
+  QVERIFY(session.controller.canAccept());
+  session.fail("marker_repositioned");
+  const auto moved = session.controller.statusText();
+  QVERIFY(moved.contains("moved an edge marker"));
+  QVERIFY(!moved.contains("resolution"));
+  QVERIFY(!session.controller.isActive());
+  QVERIFY(!session.controller.canAccept());
+  QCOMPARE(cancelled.size(), 1);
+  QCOMPARE(cancelled.last().at(0).toString(), moved);
+
+  QVERIFY(session.start());
+  session.readyBoth();
+  QVERIFY(session.controller.canAccept());
+  session.fail("display_changed");
+  const auto changed = session.controller.statusText();
+  QVERIFY(changed.contains("resolution, rotation or scaling changed"));
+  QVERIFY(changed != moved);
+  QVERIFY(!session.controller.isActive());
+  QVERIFY(!session.controller.canAccept());
+  QCOMPARE(cancelled.size(), 2);
+  QCOMPARE(cancelled.last().at(0).toString(), changed);
+}
+
 void ScreenCalibrationTests::wizardAcceptAndCancel()
 {
   Session session;
