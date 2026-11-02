@@ -8,6 +8,10 @@ create_test(
   SOURCE VolumeSyncSettingsTests.cpp
   WORKING_DIRECTORY "${CMAKE_BINARY_DIR}/src/lib/gui"
 )
+add_dependencies(VolumeSyncSettingsTests app_translations)
+target_compile_definitions(VolumeSyncSettingsTests PRIVATE
+  DESKFLOW_TEST_TRANSLATIONS_DIR="${CMAKE_BINARY_DIR}/translations"
+)
 
 create_test(
   NAME ActivitySyncSettingsTests

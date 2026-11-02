@@ -1810,7 +1810,7 @@ com.example.game
     </message>
     <message>
         <source>Volume sync</source>
-        <translation type="unfinished"></translation>
+        <translation>音量同步</translation>
     </message>
 </context>
 <context>
@@ -1916,55 +1916,55 @@ com.example.game
     <name>VolumeSyncSettings</name>
     <message>
         <source>Synchronize system volume and mute</source>
-        <translation type="unfinished"></translation>
+        <translation>同步系统音量与静音</translation>
     </message>
     <message>
         <source>Computer</source>
-        <translation type="unfinished"></translation>
+        <translation>计算机</translation>
     </message>
     <message>
         <source>Equal-loudness reference</source>
-        <translation type="unfinished"></translation>
+        <translation>等响度参考音量</translation>
     </message>
     <message>
         <source>Add computer</source>
-        <translation type="unfinished"></translation>
+        <translation>添加计算机</translation>
     </message>
     <message>
         <source>Remove selected</source>
-        <translation type="unfinished"></translation>
+        <translation>移除所选项</translation>
     </message>
     <message>
         <source>Enter the system volume each computer needs for the same perceived loudness. For example, A=100% and B=50% means A at 50% sets B to 25%. Changes work both ways; only receiving devices are capped at 100%. Mute is synchronized separately. New connections start from the server&apos;s current volume.</source>
-        <translation type="unfinished"></translation>
+        <translation>填写各计算机达到相同听感响度时的系统音量。例如 A=100%、B=50%，则 A 调为 50% 时，B 会同步到 25%。调整任一端均会同步，只有接收端的音量限制为 100%。静音状态单独同步。每次连接时以服务端当前音量为准。</translation>
     </message>
     <message>
         <source>The server controls volume synchronization and the reference levels. When enabled there, this client automatically synchronizes its current default output volume and mute in both directions.</source>
-        <translation type="unfinished"></translation>
+        <translation>音量同步开关和参考音量由服务端统一设置。服务端开启后，本客户端会自动双向同步当前默认输出设备的音量与静音状态。</translation>
     </message>
     <message>
         <source>Computer name from the server layout or external configuration:</source>
-        <translation type="unfinished"></translation>
+        <translation>服务端屏幕布局或外部配置中的计算机名称：</translation>
     </message>
     <message>
         <source>No default audio output is available.</source>
-        <translation type="unfinished"></translation>
+        <translation>没有可用的默认音频输出设备。</translation>
     </message>
     <message>
         <source>%1: system volume cannot be adjusted on this output.</source>
-        <translation type="unfinished"></translation>
+        <translation>%1：此输出设备不支持调节系统音量。</translation>
     </message>
     <message>
         <source>Default output: %1 — %2%</source>
-        <translation type="unfinished"></translation>
+        <translation>默认输出：%1 — %2%</translation>
     </message>
     <message>
         <source> (muted)</source>
-        <translation type="unfinished"></translation>
+        <translation>（已静音）</translation>
     </message>
     <message>
         <source> — system mute is not supported by this output</source>
-        <translation type="unfinished"></translation>
+        <translation> — 此输出设备不支持系统静音</translation>
     </message>
 </context>
 <context>
