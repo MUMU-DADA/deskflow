@@ -20,6 +20,7 @@
 #include "server/Server.h"
 
 #include <QJsonArray>
+#include <QTemporaryDir>
 #include <map>
 #include <memory>
 
@@ -77,6 +78,14 @@ public:
       delete static_cast<Server::ComputerConnectedInfo *>(event.getData());
     else
       Event::deleteData(event);
+  }
+  void tickTimers()
+  {
+    const auto current = handlers;
+    for (const auto &[key, handler] : current) {
+      if (key.first == EventTypes::Timer)
+        handler(Event(EventTypes::Timer, key.second));
+    }
   }
 
 private:
@@ -231,6 +240,16 @@ public:
   QRect shape{0, 0, 100, 100};
   QPoint enteredAt;
   bool calibration = false;
+  bool activity = false;
+  int activities = 0;
+  bool activitySyncEnabled() const override
+  {
+    return activity;
+  }
+  void sendActivity() override
+  {
+    ++activities;
+  }
   QList<QJsonObject> messages;
   bool alignmentCapable() const override
   {
@@ -282,7 +301,9 @@ struct GuardServerFixture
   GuardRemote *remote = nullptr; // adopted and deleted by Server
   std::unique_ptr<Server> server;
 
-  explicit GuardServerFixture(int delay = 0, bool alias = false)
+  explicit GuardServerFixture(
+      int delay = 0, bool alias = false, std::unique_ptr<deskflow::ActivitySync> activitySync = {}
+  )
   {
     static deskflow::core::ipc::CoreIpcServer ipc(nullptr); // no listening socket
     config.addComputer("guard-primary");
@@ -295,7 +316,9 @@ struct GuardServerFixture
     config.addOption("", kOptionComputerSwitchDelay, delay);
     // All platform interactions go through the primary spy. A direct Computer
     // access would fail this test instead of silently touching the real desktop.
-    server = std::make_unique<Server>(config, &primary, reinterpret_cast<deskflow::Computer *>(0x1), &events);
+    server = std::make_unique<Server>(
+        config, &primary, reinterpret_cast<deskflow::Computer *>(0x1), &events, std::move(activitySync)
+    );
     remote = new GuardRemote(&events, alias ? "remote-alias" : "guard-remote");
     server->adoptClient(remote);
   }
@@ -607,6 +630,73 @@ void ServerTests::edgeMappingStaysInsideDestination()
     QCOMPARE(test.remote->enteredAt.y(), test.remote->shape.y() + expectedPixel);
   else
     QCOMPARE(test.remote->enteredAt.x(), test.remote->shape.x() + expectedPixel);
+}
+
+void ServerTests::activityRoutesBothWaysWithoutEchoAndStopsWhenDisabled()
+{
+  class Display : public deskflow::ActivitySync
+  {
+  public:
+    int refreshes = 0;
+    int releases = 0;
+
+  protected:
+    std::optional<uint64_t> inputToken() const override
+    {
+      return 0;
+    }
+    void refreshDisplay() override
+    {
+      ++refreshes;
+    }
+    void releaseDisplay() override
+    {
+      ++releases;
+    }
+  };
+  QTemporaryDir temporary;
+  QVERIFY(temporary.isValid());
+  Settings::setSettingsFile(temporary.filePath("activity.conf"));
+  Settings::setStateFile(temporary.filePath("state.conf"));
+  Settings::setValue(Settings::Core::SyncUserActivity, true);
+  auto display = std::make_unique<Display>();
+  auto *observed = display.get();
+  GuardServerFixture test(0, false, std::move(display));
+  test.remote->activity = true;
+  test.config.addComputer("observer");
+  auto *observer = new GuardRemote(&test.events, "observer");
+  observer->activity = true;
+  test.server->adoptClient(observer);
+
+  // A client's own input is meaningful even while the cursor is on the server.
+  QVERIFY(test.events.dispatchEvent(Event(EventTypes::ClientInputActivity, test.remote->getEventTarget())));
+  QCOMPARE(observed->refreshes, 1);
+  QCOMPARE(test.remote->activities, 0); // never echo to the source
+  QCOMPARE(observer->activities, 1);
+  test.events.tickTimers();
+  QCOMPARE(test.remote->activities, 0); // receiving did not become outgoing input
+
+  test.motion(true, 51, 50);
+  // Reset the rate limiter without touching a real desktop, then record fresh input.
+  observed->reset();
+  test.motion(true, 52, 50);
+  test.events.tickTimers();
+  QCOMPARE(test.remote->activities, 1);
+  QCOMPARE(observer->activities, 2);
+  test.events.tickTimers();
+  QCOMPARE(test.remote->activities, 1); // idle ticks do not renew
+
+  observer->activity = false;
+  QVERIFY(test.events.dispatchEvent(Event(EventTypes::ClientInputActivity, test.remote->getEventTarget())));
+  QCOMPARE(observer->activities, 2); // disabled peer receives nothing
+  Settings::setValue(Settings::Core::SyncUserActivity, false);
+  QVERIFY(test.events.dispatchEvent(Event(EventTypes::ClientInputActivity, test.remote->getEventTarget())));
+  observed->reset();
+  test.motion(true, 53, 50);
+  test.events.tickTimers();
+  QCOMPARE(test.remote->activities, 1);
+  QCOMPARE(observer->activities, 2);
+  QVERIFY(observed->releases > 0);
 }
 
 QTEST_MAIN(ServerTests)

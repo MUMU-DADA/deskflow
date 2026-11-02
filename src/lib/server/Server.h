@@ -15,12 +15,14 @@
 #include "deskflow/ClipboardTypes.h"
 #include "deskflow/KeyTypes.h"
 #include "deskflow/MouseTypes.h"
+#include "platform/ActivitySync.h"
 #include "server/AlignmentSession.h"
 #include "server/Config.h"
 #include <QJsonObject>
 
 #include <climits>
 #include <map>
+#include <memory>
 #include <set>
 #include <vector>
 
@@ -137,7 +139,10 @@ public:
   client (local computer) \p primaryClient.  The client retains
   ownership of \p primaryClient.
   */
-  Server(ServerConfig &config, PrimaryClient *primaryClient, deskflow::Computer *computer, IEventQueue *events);
+  Server(
+      ServerConfig &config, PrimaryClient *primaryClient, deskflow::Computer *computer, IEventQueue *events,
+      std::unique_ptr<deskflow::ActivitySync> activitySync = {}
+  );
   Server(Server const &) = delete;
   Server(Server &&) = delete;
   ~Server();
@@ -337,6 +342,8 @@ private:
   // event processing
   void onClipboardChanged(const BaseClientProxy *sender, ClipboardID id, uint32_t seqNum);
   void onScreensaver(bool activated);
+  void pollActivity();
+  void relayActivity(BaseClientProxy *source);
   void onKeyDown(KeyID, KeyModifierMask, KeyButton, const std::string &, const char *computers);
   void onKeyUp(KeyID, KeyModifierMask, KeyButton, const char *computers);
   void onKeyRepeat(KeyID, KeyModifierMask, int32_t, KeyButton, const std::string &);
@@ -402,6 +409,7 @@ private:
   double m_switchWaitDelay = 0.0;
   EventQueueTimer *m_switchWaitTimer = nullptr;
   EventQueueTimer *m_gameGuardTimer = nullptr;
+  std::unique_ptr<deskflow::ActivitySync> m_activitySync;
   AlignmentSession m_alignmentSession;
   bool m_alignmentUiReady = false;
   uint64_t m_alignmentUiGeneration = 0;

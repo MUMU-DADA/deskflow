@@ -49,6 +49,7 @@ public:
   //@{
 
   void onInfoChanged();
+  void sendActivity(uint8_t kind);
   void onFullscreenGameGuardChanged(uint32_t sequence, bool guarded);
   void sendAlignmentMessage(const QJsonObject &message);
   bool onGrabClipboard(ClipboardID);

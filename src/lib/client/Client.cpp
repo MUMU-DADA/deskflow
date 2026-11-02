@@ -74,6 +74,7 @@ Client::Client(
   m_events->addHandler(EventTypes::ComputerResume, getEventTarget(), [this](const auto &) { handleResume(); });
   m_gameGuardTimer = m_events->newTimer(0.1, nullptr);
   m_events->addHandler(EventTypes::Timer, m_gameGuardTimer, [this](const auto &) {
+    reportActivity();
     reportFullscreenGameGuard();
     if (!m_alignmentSession.isEmpty() && std::chrono::steady_clock::now() >= m_alignmentExpires)
       cancelLocalAlignment("timeout");
@@ -194,6 +195,7 @@ void Client::handshakeComplete()
     saveRelativeRestorePosition();
   }
   sendEvent(EventTypes::ClientConnected);
+  reportActivity();
   reportFullscreenGameGuard();
   reportAlignmentCapability();
 }
@@ -342,6 +344,10 @@ void Client::screensaver(bool activate)
 
 void Client::resetOptions()
 {
+  m_activityProtocol = false;
+  m_activityReported = false;
+  m_activityEnabled = false;
+  m_activitySync.reset();
   cancelLocalAlignment("options_changed");
   m_alignmentProtocol = false;
   m_alignmentReported = false;
@@ -362,7 +368,11 @@ void Client::setOptions(const OptionsList &options)
   for (size_t index = 0; index < options.size(); index += 2) {
     const OptionID id = options[index];
     const auto value = options[index + 1];
-    if (id == kOptionAlignmentCalibration) {
+    if (id == kOptionActivitySync) {
+      m_activityProtocol = value == 1;
+      m_activityReported = false;
+      m_activitySync.reset();
+    } else if (id == kOptionAlignmentCalibration) {
       m_alignmentProtocol = (value == 1);
       m_alignmentReported = false;
     } else if (id == kOptionFullscreenGameGuard) {
@@ -389,6 +399,7 @@ void Client::setOptions(const OptionsList &options)
   }
 
   m_computer->setOptions(options);
+  reportActivity();
   reportFullscreenGameGuard();
   reportAlignmentCapability();
 }
@@ -539,6 +550,35 @@ void Client::reportFullscreenGameGuard()
     m_lastGameGuard = guarded;
     m_gameGuardReported = true;
   }
+}
+
+void Client::reportActivity()
+{
+  if (!m_server || !m_ready || !m_activityProtocol || m_suspended) {
+    m_activitySync.reset();
+    return;
+  }
+  const bool enabled =
+      deskflow::ActivitySync::supported() && Settings::value(Settings::Core::SyncUserActivity).toBool();
+  if (!m_activityReported || enabled != m_activityEnabled) {
+    m_activitySync.reset();
+    m_server->sendActivity(enabled ? 1 : 0);
+    m_activityEnabled = enabled;
+    m_activityReported = true;
+  }
+  if (enabled && m_activitySync.poll())
+    m_server->sendActivity(2);
+}
+
+bool Client::receiveActivity(uint8_t kind)
+{
+  if (!m_ready || !m_activityProtocol || kind != 2)
+    return false;
+  // Ignore notifications already in flight when the local option was disabled.
+  if (!m_suspended && m_activityReported && m_activityEnabled &&
+      Settings::value(Settings::Core::SyncUserActivity).toBool())
+    m_activitySync.receive();
+  return true;
 }
 
 void Client::saveRelativeRestorePosition()
@@ -719,6 +759,10 @@ void Client::cleanupConnection()
 
 void Client::cleanupComputer()
 {
+  m_activityProtocol = false;
+  m_activityReported = false;
+  m_activityEnabled = false;
+  m_activitySync.reset();
   cancelLocalAlignment("peer_disconnected", false);
   m_alignmentProtocol = false;
   m_alignmentReported = false;

@@ -167,7 +167,9 @@ bool ClientProxy1_0::parseHandshakeMessage(const uint8_t *code)
 
 bool ClientProxy1_0::parseMessage(const uint8_t *code)
 {
-  if (memcmp(code, kMsgDAlignment, 4) == 0) {
+  if (memcmp(code, kMsgDActivity, 4) == 0) {
+    return recvActivity();
+  } else if (memcmp(code, kMsgDAlignment, 4) == 0) {
     return recvAlignment();
   } else if (memcmp(code, kMsgDFullscreenGameGuard, 4) == 0) {
     return recvFullscreenGameGuard();
@@ -352,6 +354,9 @@ void ClientProxy1_0::screensaver(bool on)
 
 void ClientProxy1_0::resetOptions()
 {
+  m_activityAdvertised = false;
+  m_activityEnabled = false;
+  m_lastActivity.reset();
   m_alignmentAdvertised = false;
   m_alignmentCapable = false;
   m_alignmentUiReady = false;
@@ -380,7 +385,11 @@ void ClientProxy1_0::setOptions(const OptionsList &options)
 
   // check options
   for (uint32_t i = 0, n = (uint32_t)options.size(); i < n; i += 2) {
-    if (options[i] == kOptionAlignmentCalibration) {
+    if (options[i] == kOptionActivitySync) {
+      m_activityAdvertised = (options[i + 1] == 1);
+      m_activityEnabled = false;
+      m_lastActivity.reset();
+    } else if (options[i] == kOptionAlignmentCalibration) {
       m_alignmentAdvertised = (options[i + 1] == 1);
     } else if (options[i] == kOptionFullscreenGameGuard) {
       m_gameGuardAdvertised = (options[i + 1] == 1);
@@ -438,6 +447,32 @@ bool ClientProxy1_0::isForegroundGameGuarded() const
   const bool awaitingObservation =
       !m_gameGuardKnown && std::chrono::steady_clock::now() - m_gameGuardEntered < std::chrono::seconds(2);
   return m_gameGuardCapable && m_gameGuardActive && (awaitingObservation || m_gameGuarded);
+}
+
+void ClientProxy1_0::sendActivity()
+{
+  if (activitySyncEnabled())
+    ProtocolUtil::writef(getStream(), kMsgDActivity, 2);
+}
+
+bool ClientProxy1_0::recvActivity()
+{
+  uint8_t kind = 0;
+  if (!m_activityAdvertised || !ProtocolUtil::readf(getStream(), kMsgDActivity + 4, &kind) || kind > 2)
+    return false;
+  if (kind < 2) {
+    m_activityEnabled = kind == 1;
+    m_lastActivity.reset();
+    return true;
+  }
+  if (!m_activityEnabled)
+    return false;
+  const auto now = std::chrono::steady_clock::now();
+  if (!m_lastActivity || now - *m_lastActivity >= std::chrono::seconds(1)) {
+    m_lastActivity = now;
+    m_events->addEvent(Event(EventTypes::ClientInputActivity, getEventTarget()));
+  }
+  return true;
 }
 
 bool ClientProxy1_0::recvFullscreenGameGuard()

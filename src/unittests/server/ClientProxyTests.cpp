@@ -118,6 +118,15 @@ class GameGuardProxy : public ClientProxy1_0
 public:
   using ClientProxy1_0::ClientProxy1_0;
 
+  bool activity(CapturingStream *stream, uint8_t kind)
+  {
+    CapturingStream packet;
+    ProtocolUtil::writef(&packet, kMsgDActivity, kind);
+    const auto bytes = packet.take();
+    stream->feed(bytes.mid(4));
+    return parseMessage(reinterpret_cast<const uint8_t *>(bytes.constData()));
+  }
+
   bool report(CapturingStream *stream, uint32_t sequence, uint8_t guarded)
   {
     CapturingStream packet;
@@ -326,6 +335,76 @@ void ClientProxyTests::fullscreenGameGuardResetsOnNewConnection()
   GameGuardProxy reconnected("client", stream, &events);
   reconnected.enter(10, 20, 2, 0, false);
   QVERIFY(!reconnected.isForegroundGameGuarded());
+}
+
+void ClientProxyTests::activityRequiresOptInAndResets()
+{
+  MockEventQueue events;
+  auto *stream = new CapturingStream;
+  GameGuardProxy proxy("client", stream, &events);
+  stream->take();
+  proxy.sendActivity();
+  QVERIFY(stream->take().isEmpty()); // legacy client, no negotiated extension
+  proxy.setOptions({kOptionActivitySync, 1});
+  stream->take();
+  proxy.sendActivity();
+  QVERIFY(stream->take().isEmpty()); // capability alone does not opt in
+  QVERIFY(proxy.activity(stream, 1));
+  QVERIFY(proxy.activitySyncEnabled());
+  proxy.sendActivity();
+  QCOMPARE(stream->take(), QByteArray("DACT") + QByteArray(1, char(2)));
+  QVERIFY(proxy.activity(stream, 0));
+  QVERIFY(!proxy.activitySyncEnabled());
+  proxy.sendActivity();
+  QVERIFY(stream->take().isEmpty());
+  QVERIFY(proxy.activity(stream, 1));
+  proxy.resetOptions();
+  proxy.setOptions({kOptionActivitySync, 1});
+  QVERIFY(!proxy.activitySyncEnabled()); // configuration reset needs a new opt-in
+  auto *freshStream = new CapturingStream;
+  GameGuardProxy fresh("client", freshStream, &events);
+  QVERIFY(!fresh.activitySyncEnabled()); // never retained by computer name
+}
+
+void ClientProxyTests::activityRejectsInvalidPayload()
+{
+  for (const uint8_t kind : {0, 1, 2, 3, 255}) {
+    MockEventQueue events;
+    auto *stream = new CapturingStream;
+    GameGuardProxy proxy("client", stream, &events);
+    QVERIFY(!proxy.activity(stream, kind)); // unadvertised extension
+  }
+  for (const uint8_t kind : {2, 3, 255}) {
+    MockEventQueue events;
+    auto *stream = new CapturingStream;
+    GameGuardProxy proxy("client", stream, &events);
+    proxy.setOptions({kOptionActivitySync, 1});
+    QVERIFY(!proxy.activity(stream, kind)); // input before opt-in or invalid kind
+  }
+}
+
+void ClientProxyTests::activityReportsWithoutCursorAndCoalesces()
+{
+  class Events : public MockEventQueue
+  {
+  public:
+    int reports = 0;
+    void addEvent(Event &&event) override
+    {
+      if (event.getType() == EventTypes::ClientInputActivity)
+        ++reports;
+      Event::deleteData(event);
+    }
+  } events;
+  auto *stream = new CapturingStream;
+  GameGuardProxy proxy("client", stream, &events);
+  proxy.setOptions({kOptionActivitySync, 1});
+  QVERIFY(proxy.activity(stream, 1));
+  QCOMPARE(events.reports, 0);        // opt-in is not input
+  QVERIFY(proxy.activity(stream, 2)); // no enter(): local keyboard still counts
+  QCOMPARE(events.reports, 1);
+  QVERIFY(proxy.activity(stream, 2));
+  QCOMPARE(events.reports, 1); // bounded event queue under rapid notifications
 }
 
 QTEST_MAIN(ClientProxyTests)

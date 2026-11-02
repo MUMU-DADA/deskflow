@@ -26,6 +26,9 @@ private Q_SLOTS:
   void fullscreenGameGuardTracksActiveVisit();
   void fullscreenGameGuardRejectsInvalidPayload();
   void fullscreenGameGuardResetsOnNewConnection();
+  void activityRequiresOptInAndResets();
+  void activityRejectsInvalidPayload();
+  void activityReportsWithoutCursorAndCoalesces();
 
 private:
   Log m_log;

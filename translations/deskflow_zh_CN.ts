@@ -1593,6 +1593,14 @@ Moving or renaming computers in the grid resets affected alignments.</source>
         <translation>防止此计算机进入睡眠状态</translation>
     </message>
     <message>
+        <source>Synchronize activity with connected computers</source>
+        <translation>与已连接的计算机同步活动</translation>
+    </message>
+    <message>
+        <source>Keep screens awake while either computer has keyboard or mouse activity. Enable on both computers (Windows and macOS). When all computers are idle, normal display sleep resumes. Turn off &quot;Prevent this computer from going to sleep&quot; to allow idle sleep.</source>
+        <translation>任一计算机有键鼠操作时保持屏幕亮起。请在两端开启（支持 Windows 和 macOS）。所有计算机均无操作时恢复正常自动关屏。要允许空闲休眠，请关闭“防止此计算机进入睡眠状态”。</translation>
+    </message>
+    <message>
         <source>Tray icon style</source>
         <translation>托盘图标样式</translation>
     </message>

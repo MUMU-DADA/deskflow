@@ -43,11 +43,15 @@ using namespace deskflow::server;
 // Server
 //
 
-Server::Server(ServerConfig &config, PrimaryClient *primaryClient, deskflow::Computer *computer, IEventQueue *events)
+Server::Server(
+    ServerConfig &config, PrimaryClient *primaryClient, deskflow::Computer *computer, IEventQueue *events,
+    std::unique_ptr<deskflow::ActivitySync> activitySync
+)
     : m_primaryClient(primaryClient),
       m_active(primaryClient),
       m_config(&config),
       m_inputFilter(config.getInputFilter()),
+      m_activitySync(activitySync ? std::move(activitySync) : std::make_unique<deskflow::ActivitySync>()),
       m_computer(computer),
       m_events(events)
 {
@@ -153,6 +157,7 @@ Server::Server(ServerConfig &config, PrimaryClient *primaryClient, deskflow::Com
   }
   m_gameGuardTimer = m_events->newTimer(0.1, nullptr);
   m_events->addHandler(EventTypes::Timer, m_gameGuardTimer, [this](const auto &) {
+    pollActivity();
     refreshFullscreenGameGuard();
     if (m_alignmentSession.expired())
       cancelAlignment("timeout");
@@ -1140,6 +1145,10 @@ void Server::sendOptions(BaseClientProxy *client) const
   optionsList.push_back(1);
   optionsList.push_back(kOptionAlignmentCalibration);
   optionsList.push_back(1);
+  optionsList.push_back(kOptionActivitySync);
+  optionsList.push_back(
+      deskflow::ActivitySync::supported() && Settings::value(Settings::Core::SyncUserActivity).toBool() ? 1 : 0
+  );
   client->resetOptions();
   client->setOptions(optionsList);
 }
@@ -1497,6 +1506,7 @@ void Server::handleClipboardChanged(const Event &event, BaseClientProxy *client)
 
 void Server::handleKeyDownEvent(const Event &event)
 {
+  m_activitySync->noteInput();
   const auto *info = static_cast<IPlatformComputer::KeyInfo *>(event.getData());
   auto lang = AppUtil::instance().getCurrentLanguageCode();
   onKeyDown(info->m_key, info->m_mask, info->m_button, lang, info->m_computers.c_str());
@@ -1504,12 +1514,14 @@ void Server::handleKeyDownEvent(const Event &event)
 
 void Server::handleKeyUpEvent(const Event &event)
 {
+  m_activitySync->noteInput();
   auto *info = static_cast<IPlatformComputer::KeyInfo *>(event.getData());
   onKeyUp(info->m_key, info->m_mask, info->m_button, info->m_computers.c_str());
 }
 
 void Server::handleKeyRepeatEvent(const Event &event)
 {
+  m_activitySync->noteInput();
   const auto *info = static_cast<IPlatformComputer::KeyInfo *>(event.getData());
   auto lang = AppUtil::instance().getCurrentLanguageCode();
   onKeyRepeat(info->m_key, info->m_mask, info->m_count, info->m_button, lang);
@@ -1517,30 +1529,35 @@ void Server::handleKeyRepeatEvent(const Event &event)
 
 void Server::handleButtonDownEvent(const Event &event)
 {
+  m_activitySync->noteInput();
   const auto *info = static_cast<IPlatformComputer::ButtonInfo *>(event.getData());
   onMouseDown(info->m_button);
 }
 
 void Server::handleButtonUpEvent(const Event &event)
 {
+  m_activitySync->noteInput();
   const auto *info = static_cast<IPlatformComputer::ButtonInfo *>(event.getData());
   onMouseUp(info->m_button);
 }
 
 void Server::handleMotionPrimaryEvent(const Event &event)
 {
+  m_activitySync->noteInput();
   const auto *info = static_cast<IPlatformComputer::MotionInfo *>(event.getData());
   onMouseMovePrimary(info->m_x, info->m_y);
 }
 
 void Server::handleMotionSecondaryEvent(const Event &event)
 {
+  m_activitySync->noteInput();
   const auto *info = static_cast<IPlatformComputer::MotionInfo *>(event.getData());
   onMouseMoveSecondary(info->m_x, info->m_y);
 }
 
 void Server::handleWheelEvent(const Event &event)
 {
+  m_activitySync->noteInput();
   const auto *info = static_cast<IPlatformComputer::WheelInfo *>(event.getData());
   onMouseWheel(info->m_xDelta, info->m_yDelta);
 }
@@ -1806,6 +1823,31 @@ void Server::onScreensaver(bool activated)
   for (ClientList::const_iterator index = m_clients.begin(); index != m_clients.end(); ++index) {
     BaseClientProxy *client = index->second;
     client->screensaver(activated);
+  }
+}
+
+void Server::pollActivity()
+{
+  bool hasPeer = false;
+  for (const auto &[name, client] : m_clients)
+    hasPeer = hasPeer || (client != m_primaryClient && client->activitySyncEnabled());
+  if (!Settings::value(Settings::Core::SyncUserActivity).toBool() || !hasPeer) {
+    m_activitySync->reset();
+    return;
+  }
+  if (m_activitySync->poll())
+    relayActivity(m_primaryClient);
+}
+
+void Server::relayActivity(BaseClientProxy *source)
+{
+  if (!Settings::value(Settings::Core::SyncUserActivity).toBool() ||
+      (source != m_primaryClient && !source->activitySyncEnabled()))
+    return;
+  m_activitySync->receive();
+  for (const auto &[name, client] : m_clients) {
+    if (client != m_primaryClient && client != source && client->activitySyncEnabled())
+      client->sendActivity();
   }
 }
 
@@ -2191,6 +2233,9 @@ bool Server::addClient(BaseClientProxy *client)
   m_events->addHandler(EventTypes::AlignmentPeer, client->getEventTarget(), [this, client](const auto &event) {
     handleAlignmentPeer(client, event);
   });
+  m_events->addHandler(EventTypes::ClientInputActivity, client->getEventTarget(), [this, client](const auto &) {
+    relayActivity(client);
+  });
 
   // add to list
   m_clientSet.insert(client);
@@ -2224,6 +2269,7 @@ bool Server::removeClient(BaseClientProxy *client)
   m_events->removeHandler(ClipboardGrabbed, client->getEventTarget());
   m_events->removeHandler(ClipboardChanged, client->getEventTarget());
   m_events->removeHandler(AlignmentPeer, client->getEventTarget());
+  m_events->removeHandler(ClientInputActivity, client->getEventTarget());
 
   // remove from list
   m_clients.erase(getName(client));

@@ -1774,6 +1774,14 @@ com.example.game
         <source>Add games that are not recognized automatically. Use an executable name, full path, or application identifier. Entries match exactly; fullscreen is still required.</source>
         <translation type="unfinished"></translation>
     </message>
+    <message>
+        <source>Synchronize activity with connected computers</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Keep screens awake while either computer has keyboard or mouse activity. Enable on both computers (Windows and macOS). When all computers are idle, normal display sleep resumes. Turn off &quot;Prevent this computer from going to sleep&quot; to allow idle sleep.</source>
+        <translation type="unfinished"></translation>
+    </message>
 </context>
 <context>
     <name>SettingsDialogButtonBox</name>

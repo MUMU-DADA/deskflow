@@ -2,6 +2,14 @@
 # SPDX-License-Identifier: MIT
 
 create_test(
+  NAME ActivitySyncTests
+  DEPENDS platform
+  LIBS base arch
+  SOURCE ActivitySyncTests.cpp
+  WORKING_DIRECTORY "${CMAKE_BINARY_DIR}/src/lib/platform"
+)
+
+create_test(
   NAME ForegroundGameTests
   DEPENDS platform
   LIBS base arch

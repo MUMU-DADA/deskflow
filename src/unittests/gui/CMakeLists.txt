@@ -1,6 +1,14 @@
 # SPDX-FileCopyrightText: (C) 2025 Deskflow Developers
 # SPDX-License-Identifier: MIT
 
+create_test(
+  NAME ActivitySyncSettingsTests
+  DEPENDS gui
+  LIBS common Qt6::Widgets
+  SOURCE ActivitySyncSettingsTests.cpp
+  WORKING_DIRECTORY "${CMAKE_BINARY_DIR}/src/lib/gui"
+)
+
 add_subdirectory(config)
 add_subdirectory(core)
 

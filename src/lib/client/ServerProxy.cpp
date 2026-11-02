@@ -309,6 +309,14 @@ ServerProxy::ConnectionResult ServerProxy::parseMessage(const uint8_t *code)
     grabClipboard();
   }
 
+  else if (memcmp(code, kMsgDActivity, 4) == 0) {
+    uint8_t kind = 0;
+    if (!ProtocolUtil::readf(m_stream, kMsgDActivity + 4, &kind) || !m_client->receiveActivity(kind)) {
+      requestDisconnect("invalid activity sync message");
+      return Disconnect;
+    }
+  }
+
   else if (memcmp(code, kMsgCScreenSaver, 4) == 0) {
     screensaver();
   }
@@ -833,4 +841,9 @@ void ServerProxy::infoAcknowledgment()
 {
   LOG_VERBOSE("recv info acknowledgment");
   m_ignoreMouse = false;
+}
+
+void ServerProxy::sendActivity(uint8_t kind)
+{
+  ProtocolUtil::writef(m_stream, kMsgDActivity, kind);
 }

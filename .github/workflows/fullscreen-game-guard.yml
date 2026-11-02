@@ -3,7 +3,7 @@
 name: Fullscreen game guard
 on:
   push:
-    branches: [feature/fullscreen-game-guard, feature/physical-screen-alignment]
+    branches: [feature/fullscreen-game-guard, feature/physical-screen-alignment, codex/activity-sync]
   workflow_dispatch:
 permissions:
   contents: read

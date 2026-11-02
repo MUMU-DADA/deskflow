@@ -13,6 +13,7 @@
 #include "server/ClientProxy.h"
 
 #include <chrono>
+#include <optional>
 
 class Event;
 class EventQueueTimer;
@@ -44,6 +45,11 @@ public:
     return alignmentCapable() && m_alignmentUiReady;
   }
   bool sendAlignmentMessage(const QJsonObject &message) override;
+  bool activitySyncEnabled() const override
+  {
+    return m_activityAdvertised && m_activityEnabled;
+  }
+  void sendActivity() override;
 
   // IClient overrides
   void enter(int32_t xAbs, int32_t yAbs, uint32_t seqNum, KeyModifierMask mask, bool forScreensaver) override;
@@ -91,6 +97,7 @@ private:
   bool recvGrabClipboard();
   bool recvFullscreenGameGuard();
   bool recvAlignment();
+  bool recvActivity();
 
 protected:
   struct ClientClipboard
@@ -112,6 +119,9 @@ private:
   ClientInfo m_info;
   // This state belongs to this connection, never to a reusable computer name.
   bool m_gameGuardAdvertised = false;
+  bool m_activityAdvertised = false;
+  bool m_activityEnabled = false;
+  std::optional<std::chrono::steady_clock::time_point> m_lastActivity;
   bool m_alignmentAdvertised = false;
   bool m_alignmentCapable = false;
   bool m_alignmentUiReady = false;

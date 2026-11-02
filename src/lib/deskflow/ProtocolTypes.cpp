@@ -9,6 +9,7 @@
 
 const char *const kMsgDFullscreenGameGuard = "DFSG%4i%1i";
 const char *const kMsgDAlignment = "DCAL%s";
+const char *const kMsgDActivity = "DACT%1i";
 
 // The protocol name string within the hello and hello back messages must be
 // 7 chars for backward compatibility (Synergy and Barrier are 7 chars).

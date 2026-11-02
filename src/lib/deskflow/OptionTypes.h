@@ -62,6 +62,8 @@ static const OptionID kOptionClipboardSharingSize = OPTION_CODE("CLSZ");
 static const OptionID kOptionFullscreenGameGuard = OPTION_CODE("FGCP");
 // Bidirectional DCAL is permitted only after this advertisement and a client capability reply.
 static const OptionID kOptionAlignmentCalibration = OPTION_CODE("ALCP");
+// DACT is allowed only after ASCP=1 and the client's explicit opt-in reply.
+static const OptionID kOptionActivitySync = OPTION_CODE("ASCP");
 //@}
 
 //! @name Computer switch corner masks

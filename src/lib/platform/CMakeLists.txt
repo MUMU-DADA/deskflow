@@ -194,7 +194,7 @@ elseif(UNIX)
 endif()
 
 # wayland.h is included to check for wayland support
-add_library(platform STATIC ${PLATFORM_SOURCES} ForegroundGame.cpp ForegroundGame.h)
+add_library(platform STATIC ${PLATFORM_SOURCES} ForegroundGame.cpp ForegroundGame.h ActivitySync.cpp ActivitySync.h)
 
 if(UNIX AND NOT APPLE AND BUILD_X11_SUPPORT)
   target_include_directories(platform PRIVATE ${FOREGROUND_XCB_INCLUDE_DIRS})

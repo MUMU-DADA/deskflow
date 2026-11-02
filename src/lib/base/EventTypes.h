@@ -49,6 +49,7 @@ enum class EventTypes : uint32_t
   AlignmentLocal,
   /// Negotiated calibration messages/status received from a client connection.
   AlignmentPeer,
+  ClientInputActivity,
 
   /// A stream sends this event when \c read() will return with data.
   StreamInputReady,

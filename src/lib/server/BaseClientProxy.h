@@ -61,6 +61,13 @@ public:
   {
     return false;
   }
+  virtual bool activitySyncEnabled() const
+  {
+    return false;
+  }
+  virtual void sendActivity()
+  {
+  }
   virtual bool alignmentUiReady() const
   {
     return false;
