@@ -194,7 +194,17 @@ elseif(UNIX)
 endif()
 
 # wayland.h is included to check for wayland support
-add_library(platform STATIC ${PLATFORM_SOURCES} ForegroundGame.cpp ForegroundGame.h ActivitySync.cpp ActivitySync.h)
+# Both client and server use this leaf library. Keeping it in platform's
+# client/app/server archive cycle can leave its symbols unresolved by GNU ld.
+add_library(activity_sync STATIC ActivitySync.cpp ActivitySync.h)
+target_link_libraries(activity_sync PUBLIC base)
+if(APPLE)
+  target_link_libraries(activity_sync PRIVATE ${lib_IOKit} ${lib_ApplicationServices})
+elseif(WIN32)
+  target_link_libraries(activity_sync PRIVATE user32 kernel32 version)
+endif()
+
+add_library(platform STATIC ${PLATFORM_SOURCES} ForegroundGame.cpp ForegroundGame.h)
 
 if(UNIX AND NOT APPLE AND BUILD_X11_SUPPORT)
   target_include_directories(platform PRIVATE ${FOREGROUND_XCB_INCLUDE_DIRS})

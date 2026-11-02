@@ -3,7 +3,7 @@
 
 create_test(
   NAME ActivitySyncTests
-  DEPENDS platform
+  DEPENDS activity_sync
   LIBS base arch
   SOURCE ActivitySyncTests.cpp
   WORKING_DIRECTORY "${CMAKE_BINARY_DIR}/src/lib/platform"
