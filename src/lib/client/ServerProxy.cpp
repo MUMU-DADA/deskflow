@@ -309,7 +309,20 @@ ServerProxy::ConnectionResult ServerProxy::parseMessage(const uint8_t *code)
     grabClipboard();
   }
 
-  else if (memcmp(code, kMsgDActivity, 4) == 0) {
+  else if (memcmp(code, kMsgDVolume, 4) == 0) {
+    uint8_t kind = 0, flags = 0;
+    uint16_t level = 0;
+    uint32_t epoch = 0, sequence = 0;
+    if (!ProtocolUtil::readf(m_stream, kMsgDVolume + 4, &kind, &epoch, &sequence, &level, &flags)) {
+      requestDisconnect("incomplete volume sync message");
+      return Disconnect;
+    }
+    const auto message = deskflow::volume::decode(kind, epoch, sequence, level, flags);
+    if (!message || !m_client->receiveVolume(*message)) {
+      requestDisconnect("invalid volume sync message");
+      return Disconnect;
+    }
+  } else if (memcmp(code, kMsgDActivity, 4) == 0) {
     uint8_t kind = 0;
     if (!ProtocolUtil::readf(m_stream, kMsgDActivity + 4, &kind) || !m_client->receiveActivity(kind)) {
       requestDisconnect("invalid activity sync message");
@@ -846,4 +859,12 @@ void ServerProxy::infoAcknowledgment()
 void ServerProxy::sendActivity(uint8_t kind)
 {
   ProtocolUtil::writef(m_stream, kMsgDActivity, kind);
+}
+
+void ServerProxy::sendVolume(const deskflow::volume::Message &message)
+{
+  ProtocolUtil::writef(
+      m_stream, kMsgDVolume, uint8_t(message.kind), message.epoch, message.sequence, message.state.volume,
+      message.flags()
+  );
 }

@@ -29,6 +29,7 @@ private Q_SLOTS:
   void activityRequiresOptInAndResets();
   void activityRejectsInvalidPayload();
   void legacyClientActivityIsIgnored();
+  void volumeNegotiatesAndCoalescesWithoutBreakingLegacyProtocol();
 
 private:
   Log m_log;

@@ -7,6 +7,7 @@
 
 #pragma once
 
+#include "common/VolumeSync.h"
 #include "deskflow/IClient.h"
 #include <QJsonObject>
 
@@ -67,6 +68,21 @@ public:
   }
   virtual void sendActivity()
   {
+  }
+  virtual uint8_t volumeCapabilities() const
+  {
+    return 0;
+  }
+  virtual bool volumeInitialized() const
+  {
+    return false;
+  }
+  virtual void sendVolumeState(deskflow::volume::State, uint8_t)
+  {
+  }
+  virtual std::optional<deskflow::volume::Message> takeVolumeChange()
+  {
+    return std::nullopt;
   }
   virtual bool alignmentUiReady() const
   {

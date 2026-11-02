@@ -2,6 +2,14 @@
 # SPDX-License-Identifier: MIT
 
 create_test(
+  NAME VolumeSyncSettingsTests
+  DEPENDS gui
+  LIBS common Qt6::Widgets
+  SOURCE VolumeSyncSettingsTests.cpp
+  WORKING_DIRECTORY "${CMAKE_BINARY_DIR}/src/lib/gui"
+)
+
+create_test(
   NAME ActivitySyncSettingsTests
   DEPENDS gui
   LIBS common Qt6::Widgets

@@ -74,6 +74,7 @@ Client::Client(
   m_events->addHandler(EventTypes::ComputerResume, getEventTarget(), [this](const auto &) { handleResume(); });
   m_gameGuardTimer = m_events->newTimer(0.1, nullptr);
   m_events->addHandler(EventTypes::Timer, m_gameGuardTimer, [this](const auto &) {
+    pollVolume();
     reportFullscreenGameGuard();
     if (!m_alignmentSession.isEmpty() && std::chrono::steady_clock::now() >= m_alignmentExpires)
       cancelLocalAlignment("timeout");
@@ -195,6 +196,7 @@ void Client::handshakeComplete()
   }
   sendEvent(EventTypes::ClientConnected);
   reportActivityCapability();
+  pollVolume();
   reportFullscreenGameGuard();
   reportAlignmentCapability();
 }
@@ -343,6 +345,9 @@ void Client::screensaver(bool activate)
 
 void Client::resetOptions()
 {
+  m_volumeProtocol = false;
+  m_volume.enable(false);
+  m_volumeWarning = false;
   m_activityProtocol = false;
   m_activityReported = false;
   m_activityEnabled = false;
@@ -367,7 +372,9 @@ void Client::setOptions(const OptionsList &options)
   for (size_t index = 0; index < options.size(); index += 2) {
     const OptionID id = options[index];
     const auto value = options[index + 1];
-    if (id == kOptionActivitySync) {
+    if (id == kOptionVolumeSync) {
+      m_volumeProtocol = value == 1;
+    } else if (id == kOptionActivitySync) {
       m_activityProtocol = value == 1;
       m_activityReported = false;
       m_activitySync.reset();
@@ -399,6 +406,7 @@ void Client::setOptions(const OptionsList &options)
 
   m_computer->setOptions(options);
   reportActivityCapability();
+  pollVolume();
   reportFullscreenGameGuard();
   reportAlignmentCapability();
 }
@@ -566,6 +574,28 @@ void Client::reportActivityCapability()
     m_activityEnabled = enabled;
     m_activityReported = true;
   }
+}
+
+void Client::pollVolume()
+{
+  m_volume.enable(m_volumeProtocol && m_ready && m_server && !m_suspended);
+  if (const auto message = m_volume.poll())
+    m_server->sendVolume(*message);
+}
+
+bool Client::receiveVolume(const deskflow::volume::Message &message)
+{
+  using deskflow::volume::ReceiveResult;
+  if (!m_ready || !m_volumeProtocol || m_suspended)
+    return false;
+  const auto result = m_volume.receive(message);
+  if (result == ReceiveResult::Failed && !m_volumeWarning) {
+    LOG_WARN("volume sync: default output could not be adjusted; waiting to reinitialize");
+    m_volumeWarning = true;
+  } else if (result == ReceiveResult::Applied) {
+    m_volumeWarning = false;
+  }
+  return result != ReceiveResult::Invalid;
 }
 
 bool Client::receiveActivity(uint8_t kind)
@@ -755,6 +785,8 @@ void Client::cleanupConnection()
 
 void Client::cleanupComputer()
 {
+  m_volumeProtocol = false;
+  m_volume.enable(false);
   m_activityProtocol = false;
   m_activityReported = false;
   m_activityEnabled = false;

@@ -1808,6 +1808,10 @@ com.example.game
         <source>Add games that are not recognized automatically. Use an executable name, full path, or application identifier. Entries match exactly; fullscreen is still required.</source>
         <translation>添加未被自动识别的游戏，可填写可执行文件名、完整路径或应用标识。仅精确匹配，且仍须满足前台全屏条件。</translation>
     </message>
+    <message>
+        <source>Volume sync</source>
+        <translation type="unfinished"></translation>
+    </message>
 </context>
 <context>
     <name>SettingsDialogButtonBox</name>
@@ -1906,6 +1910,61 @@ com.example.game
     <message>
         <source>Encryption Disabled</source>
         <translation>加密已禁用</translation>
+    </message>
+</context>
+<context>
+    <name>VolumeSyncSettings</name>
+    <message>
+        <source>Synchronize system volume and mute</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Computer</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Equal-loudness reference</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Add computer</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Remove selected</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Enter the system volume each computer needs for the same perceived loudness. For example, A=100% and B=50% means A at 50% sets B to 25%. Changes work both ways; only receiving devices are capped at 100%. Mute is synchronized separately. New connections start from the server&apos;s current volume.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>The server controls volume synchronization and the reference levels. When enabled there, this client automatically synchronizes its current default output volume and mute in both directions.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Computer name from the server layout or external configuration:</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>No default audio output is available.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>%1: system volume cannot be adjusted on this output.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Default output: %1 — %2%</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source> (muted)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source> — system mute is not supported by this output</source>
+        <translation type="unfinished"></translation>
     </message>
 </context>
 <context>

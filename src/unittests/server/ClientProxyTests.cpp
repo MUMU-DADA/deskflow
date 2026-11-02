@@ -118,6 +118,18 @@ class GameGuardProxy : public ClientProxy1_0
 public:
   using ClientProxy1_0::ClientProxy1_0;
 
+  bool volume(CapturingStream *stream, const deskflow::volume::Message &message)
+  {
+    CapturingStream packet;
+    ProtocolUtil::writef(
+        &packet, kMsgDVolume, uint8_t(message.kind), message.epoch, message.sequence, message.state.volume,
+        message.flags()
+    );
+    const auto bytes = packet.take();
+    stream->feed(bytes.mid(4));
+    return parseMessage(reinterpret_cast<const uint8_t *>(bytes.constData()));
+  }
+
   bool activity(CapturingStream *stream, uint8_t kind)
   {
     CapturingStream packet;
@@ -407,6 +419,51 @@ void ClientProxyTests::legacyClientActivityIsIgnored()
     QVERIFY(proxy.activity(stream, 2));
   QCOMPARE(events.reports, 0);          // also ignored while the shared cursor is here
   QVERIFY(proxy.activitySyncEnabled()); // still accepts server activity
+}
+
+void ClientProxyTests::volumeNegotiatesAndCoalescesWithoutBreakingLegacyProtocol()
+{
+  using namespace deskflow::volume;
+  class Events : public MockEventQueue
+  {
+  public:
+    int reports = 0;
+    void addEvent(Event &&event) override
+    {
+      if (event.getType() == EventTypes::ClientVolume)
+        ++reports;
+      Event::deleteData(event);
+    }
+  } events;
+  auto *stream = new CapturingStream;
+  GameGuardProxy proxy("client", stream, &events);
+  Message ready{Kind::Ready, 1, 0, {8000, false}, Volume | Mute};
+  QVERIFY(!proxy.volume(stream, ready));
+  proxy.setOptions({kOptionVolumeSync, 1});
+  QVERIFY(proxy.volume(stream, ready));
+  QCOMPARE(proxy.volumeCapabilities(), uint8_t(3));
+  QVERIFY(!proxy.volumeInitialized());
+  QVERIFY(proxy.volume(stream, {Kind::Change, 1, 1, {8000, false}, Volume}));
+  QCOMPARE(events.reports, 0);
+  stream->take();
+  proxy.sendVolumeState({4000, false}, Volume | Mute);
+  QCOMPARE(stream->take(), QByteArray("DVOL") + QByteArray::fromHex("02 00000001 00000001 0fa0 03"));
+  QVERIFY(proxy.volumeInitialized());
+  QVERIFY(proxy.volume(stream, {Kind::Change, 1, 1, {8000, false}, Volume}));
+  QVERIFY(proxy.volume(stream, {Kind::Change, 1, 2, {8000, true}, Mute}));
+  QCOMPARE(events.reports, 1);
+  const auto changed = proxy.takeVolumeChange();
+  QVERIFY(changed);
+  QCOMPARE(changed->mask, uint8_t(3));
+  QCOMPARE(changed->state.volume, uint16_t(8000));
+  QVERIFY(changed->state.muted);
+  QVERIFY(proxy.volume(stream, {Kind::Change, 1, 3, {9000, true}, Volume}));
+  QCOMPARE(events.reports, 2);
+  QVERIFY(!proxy.volume(stream, {Kind::Change, 1, 4, {10001, false}, Volume}));
+  proxy.resetOptions();
+  QCOMPARE(proxy.volumeCapabilities(), uint8_t(0));
+  QVERIFY(!proxy.takeVolumeChange());
+  QVERIFY(!proxy.volume(stream, ready));
 }
 
 QTEST_MAIN(ClientProxyTests)

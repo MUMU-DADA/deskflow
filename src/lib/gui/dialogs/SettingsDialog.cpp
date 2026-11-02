@@ -16,6 +16,7 @@
 #include "gui/TlsUtility.h"
 #include "gui/core/NetworkMonitor.h"
 #include "gui/widgets/SettingsDialogButtonBox.h"
+#include "gui/widgets/VolumeSyncSettings.h"
 
 #include <QComboBox>
 #include <QDir>
@@ -32,6 +33,8 @@ SettingsDialog::SettingsDialog(QWidget *parent, const ServerConfig &serverConfig
 {
 
   ui->setupUi(this);
+  m_volumeSettings = new VolumeSyncSettings(serverConfig, this);
+  ui->tabWidget->addTab(m_volumeSettings, tr("Volume sync"));
   layout()->addWidget(m_buttonBox);
   ui->tabWidget->setCurrentIndex(0);
 
@@ -96,6 +99,7 @@ void SettingsDialog::changeEvent(QEvent *e)
 
 void SettingsDialog::initConnections() const
 {
+  connect(m_volumeSettings, &VolumeSyncSettings::changed, this, &SettingsDialog::setButtonBoxEnabledButtons);
   connect(m_buttonBox, &SettingsDialogButtonBox::accepted, this, &SettingsDialog::accept);
   connect(m_buttonBox, &SettingsDialogButtonBox::rejected, this, &QDialog::reject);
   connect(m_buttonBox, &SettingsDialogButtonBox::reset, this, &SettingsDialog::loadFromConfig);
@@ -203,6 +207,8 @@ void SettingsDialog::resetAllSettings()
 
 void SettingsDialog::updateText()
 {
+  ui->tabWidget->setTabText(ui->tabWidget->indexOf(m_volumeSettings), tr("Volume sync"));
+  m_volumeSettings->retranslate();
   const auto logLevels = LogLevel::logLevelNames().count();
   const QStringList toolTips = {tr("Required messages"),        tr("Non-fatal errors"), tr("General warnings"),
                                 tr("General events [Default]"), tr("Debug entries"),    tr("Verbose debug output")};
@@ -223,6 +229,7 @@ void SettingsDialog::updateText()
 
 void SettingsDialog::accept()
 {
+  m_volumeSettings->save();
   Settings::setValue(Settings::Core::EnableFullscreenGameGuard, ui->cbFullscreenGameGuard->isChecked());
   Settings::setValue(Settings::Core::FullscreenGameApps, gameApplications());
   Settings::setValue(Settings::Core::Port, ui->sbPort->value());
@@ -262,6 +269,7 @@ void SettingsDialog::accept()
 
 void SettingsDialog::loadFromConfig()
 {
+  m_volumeSettings->load();
   ui->cbFullscreenGameGuard->setChecked(Settings::value(Settings::Core::EnableFullscreenGameGuard).toBool());
   ui->textGameApps->setPlainText(Settings::value(Settings::Core::FullscreenGameApps).toStringList().join('\n'));
   ui->sbPort->setValue(Settings::value(Settings::Core::Port).toInt());
@@ -377,6 +385,7 @@ void SettingsDialog::updateKeyLengthOnFile(const QString &path)
 
 void SettingsDialog::updateControls()
 {
+  m_volumeSettings->updateControls();
   const bool writable = Settings::isWritable();
   const bool serviceChecked = ui->groupService->isChecked();
   const bool logToFile = ui->groupLogToFile->isChecked();
@@ -439,6 +448,8 @@ void SettingsDialog::logLevelChanged()
 
 bool SettingsDialog::isModified() const
 {
+  if (m_volumeSettings->isModified())
+    return true;
   if (ui->cbFullscreenGameGuard->isChecked() != Settings::value(Settings::Core::EnableFullscreenGameGuard).toBool() ||
       gameApplications() != Settings::value(Settings::Core::FullscreenGameApps).toStringList())
     return true;
@@ -478,6 +489,8 @@ bool SettingsDialog::isModified() const
 
 bool SettingsDialog::isDefault() const
 {
+  if (!m_volumeSettings->isDefault())
+    return false;
   if (!ui->cbFullscreenGameGuard->isChecked() || !gameApplications().isEmpty())
     return false;
   const auto processMode = Settings::defaultValue(Settings::Core::ProcessMode).value<Settings::ProcessMode>();
@@ -515,6 +528,7 @@ bool SettingsDialog::isDefault() const
 
 void SettingsDialog::resetToDefault()
 {
+  m_volumeSettings->resetToDefault();
   ui->cbFullscreenGameGuard->setChecked(Settings::defaultValue(Settings::Core::EnableFullscreenGameGuard).toBool());
   ui->textGameApps->clear();
   ui->sbPort->setValue(Settings::defaultValue(Settings::Core::Port).toInt());

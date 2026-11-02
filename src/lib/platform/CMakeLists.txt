@@ -204,6 +204,16 @@ elseif(WIN32)
   target_link_libraries(activity_sync PRIVATE user32 kernel32 version)
 endif()
 
+add_library(system_volume STATIC SystemVolume.cpp SystemVolume.h)
+target_link_libraries(system_volume PUBLIC common)
+if(APPLE)
+  find_library(VOLUME_CORE_AUDIO CoreAudio REQUIRED)
+  find_library(VOLUME_AUDIO_TOOLBOX AudioToolbox REQUIRED)
+  target_link_libraries(system_volume PRIVATE ${VOLUME_CORE_AUDIO} ${VOLUME_AUDIO_TOOLBOX})
+elseif(WIN32)
+  target_link_libraries(system_volume PRIVATE ole32 uuid propsys)
+endif()
+
 add_library(platform STATIC ${PLATFORM_SOURCES} ForegroundGame.cpp ForegroundGame.h)
 
 if(UNIX AND NOT APPLE AND BUILD_X11_SUPPORT)

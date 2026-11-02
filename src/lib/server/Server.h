@@ -16,6 +16,7 @@
 #include "deskflow/KeyTypes.h"
 #include "deskflow/MouseTypes.h"
 #include "platform/ActivitySync.h"
+#include "platform/SystemVolume.h"
 #include "server/AlignmentSession.h"
 #include "server/Config.h"
 #include <QJsonObject>
@@ -141,7 +142,8 @@ public:
   */
   Server(
       ServerConfig &config, PrimaryClient *primaryClient, deskflow::Computer *computer, IEventQueue *events,
-      std::unique_ptr<deskflow::ActivitySync> activitySync = {}
+      std::unique_ptr<deskflow::ActivitySync> activitySync = {},
+      std::unique_ptr<deskflow::volume::Control> volumeControl = {}
   );
   Server(Server const &) = delete;
   Server(Server &&) = delete;
@@ -343,6 +345,10 @@ private:
   void onClipboardChanged(const BaseClientProxy *sender, ClipboardID id, uint32_t seqNum);
   void onScreensaver(bool activated);
   void pollActivity();
+  void pollVolume();
+  void handleClientVolume(BaseClientProxy *client);
+  deskflow::volume::State
+  mappedVolume(deskflow::volume::State state, const BaseClientProxy *source, const BaseClientProxy *target) const;
   void onKeyDown(KeyID, KeyModifierMask, KeyButton, const std::string &, const char *computers);
   void onKeyUp(KeyID, KeyModifierMask, KeyButton, const char *computers);
   void onKeyRepeat(KeyID, KeyModifierMask, int32_t, KeyButton, const std::string &);
@@ -409,6 +415,10 @@ private:
   EventQueueTimer *m_switchWaitTimer = nullptr;
   EventQueueTimer *m_gameGuardTimer = nullptr;
   std::unique_ptr<deskflow::ActivitySync> m_activitySync;
+  deskflow::volume::Monitor m_volume;
+  std::optional<deskflow::volume::Weights> m_volumeReferences;
+  bool m_volumeConfigured = false;
+  bool m_volumeWarning = false;
   AlignmentSession m_alignmentSession;
   bool m_alignmentUiReady = false;
   uint64_t m_alignmentUiGeneration = 0;

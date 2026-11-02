@@ -45,13 +45,16 @@ using namespace deskflow::server;
 
 Server::Server(
     ServerConfig &config, PrimaryClient *primaryClient, deskflow::Computer *computer, IEventQueue *events,
-    std::unique_ptr<deskflow::ActivitySync> activitySync
+    std::unique_ptr<deskflow::ActivitySync> activitySync, std::unique_ptr<deskflow::volume::Control> volumeControl
 )
     : m_primaryClient(primaryClient),
       m_active(primaryClient),
       m_config(&config),
       m_inputFilter(config.getInputFilter()),
       m_activitySync(activitySync ? std::move(activitySync) : std::make_unique<deskflow::ActivitySync>()),
+      m_volume(volumeControl ? std::move(volumeControl) : deskflow::volume::makeSystemVolumeControl()),
+      m_volumeReferences(deskflow::volume::parseWeights(Settings::value(Settings::Server::VolumeWeights).toString())),
+      m_volumeConfigured(m_volumeReferences && Settings::value(Settings::Core::SyncSystemVolume).toBool()),
       m_computer(computer),
       m_events(events)
 {
@@ -158,6 +161,7 @@ Server::Server(
   m_gameGuardTimer = m_events->newTimer(0.1, nullptr);
   m_events->addHandler(EventTypes::Timer, m_gameGuardTimer, [this](const auto &) {
     pollActivity();
+    pollVolume();
     refreshFullscreenGameGuard();
     if (m_alignmentSession.expired())
       cancelAlignment("timeout");
@@ -1149,6 +1153,8 @@ void Server::sendOptions(BaseClientProxy *client) const
   optionsList.push_back(
       deskflow::ActivitySync::supported() && Settings::value(Settings::Core::SyncUserActivity).toBool() ? 1 : 0
   );
+  optionsList.push_back(kOptionVolumeSync);
+  optionsList.push_back(deskflow::volume::systemVolumeSupported() && m_volumeConfigured ? 1 : 0);
   client->resetOptions();
   client->setOptions(optionsList);
 }
@@ -1848,6 +1854,62 @@ void Server::pollActivity()
   }
 }
 
+deskflow::volume::State
+Server::mappedVolume(deskflow::volume::State state, const BaseClientProxy *source, const BaseClientProxy *target) const
+{
+  return deskflow::volume::scale(
+      state, deskflow::volume::reference(*m_volumeReferences, QString::fromStdString(getName(source))),
+      deskflow::volume::reference(*m_volumeReferences, QString::fromStdString(getName(target)))
+  );
+}
+
+void Server::pollVolume()
+{
+  using namespace deskflow::volume;
+  if (!m_volumeConfigured) {
+    m_volume.reset();
+    return;
+  }
+  if (!m_volume.poll())
+    return;
+  const auto &snapshot = m_volume.snapshot();
+  if (!snapshot || !(snapshot->capabilities & Volume))
+    return;
+  const uint8_t changes = m_volume.deviceChanged() ? snapshot->capabilities : m_volume.changes();
+  for (const auto &[name, client] : m_clients) {
+    if (client == m_primaryClient || !(client->volumeCapabilities() & Volume))
+      continue;
+    // A newly connected/rebound client ALWAYS starts from the server's actual
+    // current level, not a previously clipped client's normalized value.
+    const uint8_t mask = client->volumeInitialized() ? changes : snapshot->capabilities;
+    if (mask)
+      client->sendVolumeState(mappedVolume(snapshot->state, m_primaryClient, client), mask);
+  }
+}
+
+void Server::handleClientVolume(BaseClientProxy *source)
+{
+  using namespace deskflow::volume;
+  const auto change = source->takeVolumeChange();
+  if (!change || !m_volumeConfigured)
+    return;
+  if (const auto &snapshot = m_volume.snapshot(); snapshot) {
+    const uint8_t mask = change->mask & snapshot->capabilities;
+    if (mask) {
+      const bool applied = m_volume.apply(mappedVolume(change->state, source, m_primaryClient), mask);
+      if (!applied && !m_volumeWarning)
+        LOG_WARN("volume sync: unable to adjust the server's current default output");
+      m_volumeWarning = !applied;
+    }
+  }
+  // Map directly from the originating level. Never echo its own change back,
+  // and never use the server's clipped readback as a new source.
+  for (const auto &[name, client] : m_clients) {
+    if (client != m_primaryClient && client != source && client->volumeInitialized())
+      client->sendVolumeState(mappedVolume(change->state, source, client), change->mask);
+  }
+}
+
 void Server::onKeyDown(KeyID id, KeyModifierMask mask, KeyButton button, const std::string &lang, const char *computers)
 {
   LOG_VERBOSE("onKeyDown id=%d mask=0x%04x button=0x%04x lang=%s", id, mask, button, lang.c_str());
@@ -2230,6 +2292,9 @@ bool Server::addClient(BaseClientProxy *client)
   m_events->addHandler(EventTypes::AlignmentPeer, client->getEventTarget(), [this, client](const auto &event) {
     handleAlignmentPeer(client, event);
   });
+  m_events->addHandler(EventTypes::ClientVolume, client->getEventTarget(), [this, client](const auto &) {
+    handleClientVolume(client);
+  });
 
   // add to list
   m_clientSet.insert(client);
@@ -2263,6 +2328,7 @@ bool Server::removeClient(BaseClientProxy *client)
   m_events->removeHandler(ClipboardGrabbed, client->getEventTarget());
   m_events->removeHandler(ClipboardChanged, client->getEventTarget());
   m_events->removeHandler(AlignmentPeer, client->getEventTarget());
+  m_events->removeHandler(ClientVolume, client->getEventTarget());
 
   // remove from list
   m_clients.erase(getName(client));

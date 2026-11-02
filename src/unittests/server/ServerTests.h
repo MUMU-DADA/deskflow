@@ -24,6 +24,8 @@ private Q_SLOTS:
   void edgeMappingStaysInsideDestination_data();
   void edgeMappingStaysInsideDestination();
   void serverActivityReachesAllClientsAndStopsWhenDisabled();
+  void volumeRatioMuteAndReconnectUseTheCorrectSource();
+  void disabledVolumeNeverTouchesTheDefaultOutput();
 
 private:
   Log m_log;

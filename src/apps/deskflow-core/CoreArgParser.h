@@ -31,6 +31,8 @@ public:
   QString errorText() const;
   bool help() const;
   bool version() const;
+  bool volumeStatus() const;
+  bool volumeCheck() const;
   bool serverMode() const;
   bool clientMode() const;
   bool singleInstanceOnly() const;

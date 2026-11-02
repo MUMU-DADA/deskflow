@@ -57,6 +57,7 @@ public:
     inline static const auto Port = QStringLiteral("core/port");
     inline static const auto PreventSleep = QStringLiteral("core/preventSleep");
     inline static const auto SyncUserActivity = QStringLiteral("core/syncUserActivity");
+    inline static const auto SyncSystemVolume = QStringLiteral("core/syncSystemVolume");
     inline static const auto ProcessMode = QStringLiteral("core/processMode");
     inline static const auto ComputerName = QStringLiteral("core/computerName");
     inline static const auto Display = QStringLiteral("core/display");
@@ -106,6 +107,7 @@ public:
   };
   struct Server
   {
+    inline static const auto VolumeWeights = QStringLiteral("server/volumeWeights");
     inline static const auto ClipboardSize = QStringLiteral("server/clipboardSize");
     inline static const auto DefaultLockToComputerState = QStringLiteral("server/defaultLockToComputerState");
     inline static const auto DisableLockToComputer = QStringLiteral("server/disableLockToComputer");
@@ -290,6 +292,7 @@ private:
     , Core::Port
     , Core::PreventSleep
     , Core::SyncUserActivity
+    , Core::SyncSystemVolume
     , Core::EnableFullscreenGameGuard
     , Core::FullscreenGameApps
     , Core::FullscreenGameStateFile
@@ -327,6 +330,7 @@ private:
     , Security::KeySize
     , Security::TlsEnabled
     , Server::ClipboardSize
+    , Server::VolumeWeights
     , Server::DefaultLockToComputerState
     , Server::DisableLockToComputer
     , Server::EnableClipboard
@@ -355,6 +359,7 @@ private:
     , Gui::IgnoreMissingKeyboardLayouts
     , Core::PreventSleep
     , Core::SyncUserActivity
+    , Core::SyncSystemVolume
     , Core::EnableEnterCommand
     , Core::EnableExitCommand
     , Client::DynamicConnectionRetry

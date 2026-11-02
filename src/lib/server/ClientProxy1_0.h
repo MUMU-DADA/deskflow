@@ -50,6 +50,16 @@ public:
     return m_activityAdvertised && m_activityEnabled;
   }
   void sendActivity() override;
+  uint8_t volumeCapabilities() const override
+  {
+    return m_volume.capabilities();
+  }
+  bool volumeInitialized() const override
+  {
+    return m_volume.initialized();
+  }
+  void sendVolumeState(deskflow::volume::State state, uint8_t mask) override;
+  std::optional<deskflow::volume::Message> takeVolumeChange() override;
 
   // IClient overrides
   void enter(int32_t xAbs, int32_t yAbs, uint32_t seqNum, KeyModifierMask mask, bool forScreensaver) override;
@@ -98,6 +108,7 @@ private:
   bool recvFullscreenGameGuard();
   bool recvAlignment();
   bool recvActivity();
+  bool recvVolume();
 
 protected:
   struct ClientClipboard
@@ -121,6 +132,8 @@ private:
   bool m_gameGuardAdvertised = false;
   bool m_activityAdvertised = false;
   bool m_activityEnabled = false;
+  deskflow::volume::PeerSession m_volume;
+  bool m_volumeEventQueued = false;
   bool m_alignmentAdvertised = false;
   bool m_alignmentCapable = false;
   bool m_alignmentUiReady = false;

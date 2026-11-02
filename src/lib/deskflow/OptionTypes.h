@@ -36,6 +36,7 @@ using OptionsList = std::vector<uint32_t>;
 //! @name Option identifiers
 //@{
 static const OptionID kOptionHalfDuplexCapsLock = OPTION_CODE("HDCL");
+static const OptionID kOptionVolumeSync = OPTION_CODE("VSCP");
 static const OptionID kOptionHalfDuplexNumLock = OPTION_CODE("HDNL");
 static const OptionID kOptionHalfDuplexScrollLock = OPTION_CODE("HDSL");
 static const OptionID kOptionModifierMapForShift = OPTION_CODE("MMFS");

@@ -12,6 +12,7 @@
 #include "gui/config/ServerConfig.h"
 
 class SettingsDialogButtonBox;
+class VolumeSyncSettings;
 
 namespace Ui {
 class SettingsDialog;
@@ -88,4 +89,5 @@ private:
   std::unique_ptr<Ui::SettingsDialog> ui;
   const ServerConfig &m_serverConfig;
   SettingsDialogButtonBox *m_buttonBox = nullptr;
+  VolumeSyncSettings *m_volumeSettings = nullptr;
 };

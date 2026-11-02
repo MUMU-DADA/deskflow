@@ -14,6 +14,8 @@ if(APPLE)
 endif()
 
 add_library(${target} STATIC
+  widgets/VolumeSyncSettings.cpp
+  widgets/VolumeSyncSettings.h
   ${platform_sources}
   ComputerSetupModel.cpp
   ComputerSetupModel.h
@@ -132,6 +134,7 @@ add_library(${target} STATIC
 target_link_libraries(${target}
   PUBLIC
     common
+    system_volume
     platform
     net
     Qt6::Widgets

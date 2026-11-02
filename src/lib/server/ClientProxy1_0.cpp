@@ -167,7 +167,9 @@ bool ClientProxy1_0::parseHandshakeMessage(const uint8_t *code)
 
 bool ClientProxy1_0::parseMessage(const uint8_t *code)
 {
-  if (memcmp(code, kMsgDActivity, 4) == 0) {
+  if (memcmp(code, kMsgDVolume, 4) == 0) {
+    return recvVolume();
+  } else if (memcmp(code, kMsgDActivity, 4) == 0) {
     return recvActivity();
   } else if (memcmp(code, kMsgDAlignment, 4) == 0) {
     return recvAlignment();
@@ -354,6 +356,8 @@ void ClientProxy1_0::screensaver(bool on)
 
 void ClientProxy1_0::resetOptions()
 {
+  m_volume.reset();
+  m_volumeEventQueued = false;
   m_activityAdvertised = false;
   m_activityEnabled = false;
   m_alignmentAdvertised = false;
@@ -384,7 +388,10 @@ void ClientProxy1_0::setOptions(const OptionsList &options)
 
   // check options
   for (uint32_t i = 0, n = (uint32_t)options.size(); i < n; i += 2) {
-    if (options[i] == kOptionActivitySync) {
+    if (options[i] == kOptionVolumeSync) {
+      m_volume.reset(options[i + 1] == 1);
+      m_volumeEventQueued = false;
+    } else if (options[i] == kOptionActivitySync) {
       m_activityAdvertised = (options[i + 1] == 1);
       m_activityEnabled = false;
     } else if (options[i] == kOptionAlignmentCalibration) {
@@ -451,6 +458,38 @@ void ClientProxy1_0::sendActivity()
 {
   if (activitySyncEnabled())
     ProtocolUtil::writef(getStream(), kMsgDActivity, 2);
+}
+
+void ClientProxy1_0::sendVolumeState(deskflow::volume::State state, uint8_t mask)
+{
+  if (const auto message = m_volume.set(state, mask))
+    ProtocolUtil::writef(
+        getStream(), kMsgDVolume, uint8_t(message->kind), message->epoch, message->sequence, message->state.volume,
+        message->flags()
+    );
+}
+
+std::optional<deskflow::volume::Message> ClientProxy1_0::takeVolumeChange()
+{
+  m_volumeEventQueued = false;
+  return m_volume.takeChange();
+}
+
+bool ClientProxy1_0::recvVolume()
+{
+  uint8_t kind = 0, flags = 0;
+  uint16_t level = 0;
+  uint32_t epoch = 0, sequence = 0;
+  if (!ProtocolUtil::readf(getStream(), kMsgDVolume + 4, &kind, &epoch, &sequence, &level, &flags))
+    return false;
+  const auto message = deskflow::volume::decode(kind, epoch, sequence, level, flags);
+  if (!message || !m_volume.receive(*message))
+    return false;
+  if (m_volume.hasChange() && !m_volumeEventQueued) {
+    m_volumeEventQueued = true;
+    m_events->addEvent(Event(EventTypes::ClientVolume, getEventTarget()));
+  }
+  return true;
 }
 
 bool ClientProxy1_0::recvActivity()

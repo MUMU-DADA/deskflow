@@ -9,6 +9,7 @@
 #pragma once
 
 #include "common/Enums.h"
+#include "common/VolumeSync.h"
 #include "deskflow/ClipboardChunk.h"
 #include "deskflow/ClipboardTypes.h"
 #include "deskflow/KeyTypes.h"
@@ -50,6 +51,7 @@ public:
 
   void onInfoChanged();
   void sendActivity(uint8_t kind);
+  void sendVolume(const deskflow::volume::Message &message);
   void onFullscreenGameGuardChanged(uint32_t sequence, bool guarded);
   void sendAlignmentMessage(const QJsonObject &message);
   bool onGrabClipboard(ClipboardID);

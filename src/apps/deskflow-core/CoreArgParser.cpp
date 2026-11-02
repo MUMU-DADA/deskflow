@@ -21,6 +21,12 @@ CoreArgParser::CoreArgParser(const QStringList &args)
   m_parser.addPositionalArgument("coremode", "The mode to start in either: server or client", "coremode");
 
   m_parser.addOptions(CoreArgs::options);
+  m_parser.addOption(
+      QCommandLineOption("volume-status", "Print default-output volume capabilities and state as JSON, then exit.")
+  );
+  m_parser.addOption(
+      QCommandLineOption("volume-check", "Verify default-output control by writing its current values back, then exit.")
+  );
   m_parser.setSingleDashWordOptionMode(QCommandLineParser::ParseAsLongOptions);
   m_parser.setOptionsAfterPositionalArgumentsMode(QCommandLineParser::ParseAsOptions);
   m_parser.parse(args);
@@ -86,6 +92,16 @@ bool CoreArgParser::help() const
 bool CoreArgParser::version() const
 {
   return m_parser.isSet(CoreArgs::versionOption);
+}
+
+bool CoreArgParser::volumeStatus() const
+{
+  return m_parser.isSet("volume-status");
+}
+
+bool CoreArgParser::volumeCheck() const
+{
+  return m_parser.isSet("volume-check");
 }
 
 bool CoreArgParser::serverMode() const

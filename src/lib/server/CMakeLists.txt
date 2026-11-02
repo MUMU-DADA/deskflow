@@ -41,7 +41,7 @@ add_library(server STATIC
   Server.h
 )
 
-target_link_libraries(server PUBLIC common activity_sync)
+target_link_libraries(server PUBLIC common activity_sync system_volume)
 
 if(UNIX)
   target_link_libraries(server PUBLIC app)

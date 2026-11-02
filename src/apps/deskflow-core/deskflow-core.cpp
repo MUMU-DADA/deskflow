@@ -16,6 +16,7 @@
 #include "deskflow/ClientApp.h"
 #include "deskflow/ServerApp.h"
 #include "deskflow/ipc/CoreIpcServer.h"
+#include "platform/SystemVolume.h"
 
 #if defined(Q_OS_WIN)
 #include "arch/win32/ArchMiscWindows.h"
@@ -25,6 +26,8 @@
 
 #include <QApplication>
 #include <QFileInfo>
+#include <QJsonDocument>
+#include <QJsonObject>
 #include <QSharedMemory>
 #include <QTextStream>
 #include <QThread>
@@ -108,6 +111,37 @@ int main(int argc, char **argv)
   if (parser.version()) {
     QTextStream(stdout) << parser.versionText();
     return s_exitSuccess;
+  }
+
+  // Diagnostics exit before Settings, shared-memory, input hooks and networking.
+  // --volume-check deliberately keeps the current volume and mute values.
+  if (parser.volumeStatus() || parser.volumeCheck()) {
+    if (!parser.errorText().isEmpty())
+      return s_exitFailed;
+    auto control = deskflow::volume::makeSystemVolumeControl();
+    const auto before = control->read();
+    QJsonObject result{{"platformSupported", deskflow::volume::systemVolumeSupported()}, {"available", bool(before)}};
+    if (before) {
+      result.insert("device", before->deviceName);
+      result.insert("deviceId", before->deviceId);
+      result.insert("volume", before->state.volume / 100.0);
+      result.insert("muted", before->state.muted);
+      result.insert("volumeSupported", bool(before->capabilities & deskflow::volume::Volume));
+      result.insert("muteSupported", bool(before->capabilities & deskflow::volume::Mute));
+    }
+    bool checked = false;
+    if (parser.volumeCheck() && before && (before->capabilities & deskflow::volume::Volume)) {
+      checked = control->write(before->deviceId, before->state, before->capabilities);
+      const auto after = control->read();
+      checked = checked && after && after->deviceId == before->deviceId && after->state == before->state;
+      result.insert("unchangedWriteVerified", checked);
+      if (after) {
+        result.insert("volumeAfter", after->state.volume / 100.0);
+        result.insert("mutedAfter", after->state.muted);
+      }
+    }
+    QTextStream(stdout) << QJsonDocument(result).toJson(QJsonDocument::Compact) << '\n';
+    return parser.volumeCheck() && !checked ? s_exitFailed : s_exitSuccess;
   }
 
   // Before we check any more args we need to check for a duplicate process.

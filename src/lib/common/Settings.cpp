@@ -320,6 +320,8 @@ void Settings::checkIfSettingsWritableChange()
 
 QVariant Settings::defaultValue(const QString &key)
 {
+  if (key == Server::VolumeWeights)
+    return QStringLiteral("{}");
   if (key == Core::FullscreenGameApps)
     return QStringList{};
 

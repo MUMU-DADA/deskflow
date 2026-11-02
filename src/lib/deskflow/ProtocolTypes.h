@@ -15,6 +15,8 @@ extern const char *const kMsgDAlignment;
 // Client -> server: 0 unsupported, 1 supported (legacy 2 input is ignored).
 // Server -> client: 2 new server input, after ASCP=1 and client capability reply.
 extern const char *const kMsgDActivity;
+//! VSCP=1 negotiated system-volume state; kind, endpoint generation, sequence, level, flags.
+extern const char *const kMsgDVolume;
 
 #include <cstdint>
 /**

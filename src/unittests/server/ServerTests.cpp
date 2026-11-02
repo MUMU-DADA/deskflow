@@ -7,6 +7,7 @@
 
 #include "ServerTests.h"
 
+#include "../common/FakeVolumeControl.h"
 #include "../deskflow/MockEventQueue.h"
 #include "base/EventQueueTimer.h"
 #include "deskflow/AppUtil.h"
@@ -242,6 +243,37 @@ public:
   bool calibration = false;
   bool activity = false;
   int activities = 0;
+  uint8_t volumeCaps = 0;
+  bool volumeHasState = false;
+  deskflow::volume::State localVolume;
+  std::vector<std::pair<deskflow::volume::State, uint8_t>> volumeUpdates;
+  std::optional<deskflow::volume::Message> volumeChange;
+  uint8_t volumeCapabilities() const override
+  {
+    return volumeCaps;
+  }
+  bool volumeInitialized() const override
+  {
+    return volumeHasState;
+  }
+  void sendVolumeState(deskflow::volume::State state, uint8_t mask) override
+  {
+    mask &= volumeCaps;
+    if (!mask)
+      return;
+    volumeHasState = true;
+    if (mask & deskflow::volume::Volume)
+      localVolume.volume = state.volume;
+    if (mask & deskflow::volume::Mute)
+      localVolume.muted = state.muted;
+    volumeUpdates.emplace_back(state, mask);
+  }
+  std::optional<deskflow::volume::Message> takeVolumeChange() override
+  {
+    auto result = volumeChange;
+    volumeChange.reset();
+    return result;
+  }
   bool activitySyncEnabled() const override
   {
     return activity;
@@ -302,7 +334,8 @@ struct GuardServerFixture
   std::unique_ptr<Server> server;
 
   explicit GuardServerFixture(
-      int delay = 0, bool alias = false, std::unique_ptr<deskflow::ActivitySync> activitySync = {}
+      int delay = 0, bool alias = false, std::unique_ptr<deskflow::ActivitySync> activitySync = {},
+      std::unique_ptr<deskflow::volume::Control> volumeControl = {}
   )
   {
     static deskflow::core::ipc::CoreIpcServer ipc(nullptr); // no listening socket
@@ -317,7 +350,8 @@ struct GuardServerFixture
     // All platform interactions go through the primary spy. A direct Computer
     // access would fail this test instead of silently touching the real desktop.
     server = std::make_unique<Server>(
-        config, &primary, reinterpret_cast<deskflow::Computer *>(0x1), &events, std::move(activitySync)
+        config, &primary, reinterpret_cast<deskflow::Computer *>(0x1), &events, std::move(activitySync),
+        std::move(volumeControl)
     );
     remote = new GuardRemote(&events, alias ? "remote-alias" : "guard-remote");
     server->adoptClient(remote);
@@ -706,6 +740,80 @@ void ServerTests::serverActivityReachesAllClientsAndStopsWhenDisabled()
   QCOMPARE(observer->activities, 2);
   QCOMPARE(observed->refreshes, 3); // disabled activity did not renew the server either
   QVERIFY(observed->releases > 0);
+}
+
+void ServerTests::volumeRatioMuteAndReconnectUseTheCorrectSource()
+{
+  using namespace deskflow::volume;
+  QTemporaryDir temporary;
+  Settings::setSettingsFile(temporary.filePath("volume.conf"));
+  Settings::setStateFile(temporary.filePath("state.conf"));
+  Settings::setValue(Settings::Core::SyncSystemVolume, true);
+  Settings::setValue(
+      Settings::Server::VolumeWeights, QStringLiteral(R"({"guard-primary":100,"guard-remote":50,"observer":25})")
+  );
+  auto control = std::make_unique<FakeVolumeControl>();
+  auto *audio = control.get();
+  GuardServerFixture test(0, true, {}, std::move(control));
+  test.remote->volumeCaps = 3;
+  test.config.addComputer("observer");
+  auto *observer = new GuardRemote(&test.events, "observer");
+  observer->volumeCaps = 3;
+  test.server->adoptClient(observer);
+  test.events.tickTimers();
+  QCOMPARE(test.remote->localVolume.volume, uint16_t(2000)); // alias uses canonical name's reference
+  QCOMPARE(observer->localVolume.volume, uint16_t(1000));
+  QCOMPARE(audio->writes, 0); // server's current level is the initial authority
+
+  test.remote->localVolume.volume = 8000;
+  test.remote->volumeChange = Message{Kind::Change, 1, 1, {8000, false}, Volume};
+  QVERIFY(test.events.dispatchEvent(Event(EventTypes::ClientVolume, test.remote->getEventTarget())));
+  QCOMPARE(audio->current.state.volume, uint16_t(10000));
+  QCOMPARE(test.remote->localVolume.volume, uint16_t(8000));
+  QCOMPARE(test.remote->volumeUpdates.size(), size_t(1)); // source is never echoed
+  QCOMPARE(observer->localVolume.volume, uint16_t(4000)); // mapped directly from B, not A's clipped 100%
+  QTest::qWait(110);
+  test.events.tickTimers();
+  QCOMPARE(test.remote->volumeUpdates.size(), size_t(1)); // readback does not feed back
+
+  audio->current.state.muted = true;
+  QTest::qWait(110);
+  test.events.tickTimers();
+  QVERIFY(test.remote->localVolume.muted);
+  QCOMPARE(test.remote->localVolume.volume, uint16_t(8000)); // mute alone cannot pull B back to 50%
+  QCOMPARE(observer->localVolume.volume, uint16_t(4000));
+  QCOMPARE(test.remote->volumeUpdates.back().second, Mute);
+
+  test.remote->volumeHasState = false; // reconnect/default-output rebind
+  QTest::qWait(110);
+  test.events.tickTimers();
+  QCOMPARE(test.remote->localVolume.volume, uint16_t(5000)); // actual server 100%, not previous source B80
+  QVERIFY(test.remote->localVolume.muted);
+
+  audio->current.deviceId = "new-server-output";
+  audio->current.state = {3000, false};
+  QTest::qWait(110);
+  test.events.tickTimers();
+  QCOMPARE(test.remote->localVolume.volume, uint16_t(1500));
+  QCOMPARE(observer->localVolume.volume, uint16_t(750));
+  QVERIFY(!test.remote->localVolume.muted);
+  Settings::setValue(Settings::Core::SyncSystemVolume, false);
+}
+
+void ServerTests::disabledVolumeNeverTouchesTheDefaultOutput()
+{
+  QTemporaryDir temporary;
+  Settings::setSettingsFile(temporary.filePath("volume-disabled.conf"));
+  Settings::setStateFile(temporary.filePath("state.conf"));
+  Settings::setValue(Settings::Core::SyncSystemVolume, false);
+  auto control = std::make_unique<FakeVolumeControl>();
+  auto *audio = control.get();
+  GuardServerFixture test(0, false, {}, std::move(control));
+  test.remote->volumeCaps = 3;
+  test.events.tickTimers();
+  QCOMPARE(audio->reads, 0);
+  QCOMPARE(audio->writes, 0);
+  QVERIFY(test.remote->volumeUpdates.empty());
 }
 
 QTEST_MAIN(ServerTests)

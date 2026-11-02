@@ -16,6 +16,7 @@
 #include "deskflow/IClipboard.h"
 #include "net/NetworkAddress.h"
 #include "platform/ActivitySync.h"
+#include "platform/SystemVolume.h"
 
 #include <QJsonObject>
 #include <chrono>
@@ -195,6 +196,7 @@ public:
   void mouseWheel(int32_t xDelta, int32_t yDelta) override;
   void screensaver(bool activate) override;
   bool receiveActivity(uint8_t kind);
+  bool receiveVolume(const deskflow::volume::Message &message);
   void resetOptions() override;
   void setOptions(const OptionsList &options) override;
   std::string getName() const override;
@@ -203,6 +205,7 @@ private:
   void saveRelativeRestorePosition();
   void reportFullscreenGameGuard();
   void reportActivityCapability();
+  void pollVolume();
   void handleAlignmentLocal(const Event &event);
   void reportAlignmentCapability();
   void publishAlignmentCapabilities();
@@ -243,6 +246,9 @@ private:
   EventQueueTimer *m_timer = nullptr;
   EventQueueTimer *m_gameGuardTimer = nullptr;
   deskflow::ActivitySync m_activitySync;
+  deskflow::volume::ClientSession m_volume{deskflow::volume::makeSystemVolumeControl()};
+  bool m_volumeProtocol = false;
+  bool m_volumeWarning = false;
   bool m_activityProtocol = false;
   bool m_activityReported = false;
   bool m_activityEnabled = false;
