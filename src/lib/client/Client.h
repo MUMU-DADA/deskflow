@@ -202,7 +202,7 @@ public:
 private:
   void saveRelativeRestorePosition();
   void reportFullscreenGameGuard();
-  void reportActivity();
+  void reportActivityCapability();
   void handleAlignmentLocal(const Event &event);
   void reportAlignmentCapability();
   void publishAlignmentCapabilities();

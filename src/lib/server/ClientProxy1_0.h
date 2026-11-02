@@ -121,7 +121,6 @@ private:
   bool m_gameGuardAdvertised = false;
   bool m_activityAdvertised = false;
   bool m_activityEnabled = false;
-  std::optional<std::chrono::steady_clock::time_point> m_lastActivity;
   bool m_alignmentAdvertised = false;
   bool m_alignmentCapable = false;
   bool m_alignmentUiReady = false;

@@ -1835,18 +1835,15 @@ void Server::pollActivity()
     m_activitySync->reset();
     return;
   }
-  if (m_activitySync->poll())
-    relayActivity(m_primaryClient);
-}
-
-void Server::relayActivity(BaseClientProxy *source)
-{
-  if (!Settings::value(Settings::Core::SyncUserActivity).toBool() ||
-      (source != m_primaryClient && !source->activitySyncEnabled()))
+  if (!m_activitySync->poll())
     return;
+
+  // Preserve local activity for server input captured while controlling a client;
+  // the OS may omit those events from its own idle timer. No client input reaches
+  // this path.
   m_activitySync->receive();
   for (const auto &[name, client] : m_clients) {
-    if (client != m_primaryClient && client != source && client->activitySyncEnabled())
+    if (client != m_primaryClient && client->activitySyncEnabled())
       client->sendActivity();
   }
 }
@@ -2233,9 +2230,6 @@ bool Server::addClient(BaseClientProxy *client)
   m_events->addHandler(EventTypes::AlignmentPeer, client->getEventTarget(), [this, client](const auto &event) {
     handleAlignmentPeer(client, event);
   });
-  m_events->addHandler(EventTypes::ClientInputActivity, client->getEventTarget(), [this, client](const auto &) {
-    relayActivity(client);
-  });
 
   // add to list
   m_clientSet.insert(client);
@@ -2269,7 +2263,6 @@ bool Server::removeClient(BaseClientProxy *client)
   m_events->removeHandler(ClipboardGrabbed, client->getEventTarget());
   m_events->removeHandler(ClipboardChanged, client->getEventTarget());
   m_events->removeHandler(AlignmentPeer, client->getEventTarget());
-  m_events->removeHandler(ClientInputActivity, client->getEventTarget());
 
   // remove from list
   m_clients.erase(getName(client));

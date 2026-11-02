@@ -1593,12 +1593,12 @@ Moving or renaming computers in the grid resets affected alignments.</source>
         <translation>防止此计算机进入睡眠状态</translation>
     </message>
     <message>
-        <source>Synchronize activity with connected computers</source>
-        <translation>与已连接的计算机同步活动</translation>
+        <source>Keep client screens awake during server activity</source>
+        <translation>服务端活动时保持客户端亮屏</translation>
     </message>
     <message>
-        <source>Keep screens awake while either computer has keyboard or mouse activity. Enable on both computers (Windows and macOS). When all computers are idle, normal display sleep resumes. Turn off &quot;Prevent this computer from going to sleep&quot; to allow idle sleep.</source>
-        <translation>任一计算机有键鼠操作时保持屏幕亮起。请在两端开启（支持 Windows 和 macOS）。所有计算机均无操作时恢复正常自动关屏。要允许空闲休眠，请关闭“防止此计算机进入睡眠状态”。</translation>
+        <source>Keyboard and mouse activity on this server keeps all connected client screens awake, even while controlling a client. Enable only on the server (Windows and macOS). Local client input does not affect other computers. When server input stops, clients use their normal display sleep settings. Turn off &quot;Prevent this computer from going to sleep&quot; on clients to allow idle sleep.</source>
+        <translation>服务端的键鼠活动会让所有已连接客户端保持亮屏，包括使用服务端键鼠控制客户端时。仅需在服务端开启（支持 Windows 和 macOS）。客户端本地键鼠不会影响其他计算机。服务端停止操作后，客户端按各自的系统设置正常关屏。要允许客户端空闲休眠，请关闭其“防止此计算机进入睡眠状态”。</translation>
     </message>
     <message>
         <source>Tray icon style</source>

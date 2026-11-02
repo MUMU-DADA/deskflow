@@ -12,7 +12,8 @@
 extern const char *const kMsgDFullscreenGameGuard;
 //! ALCP=1 negotiated, bounded length-prefixed calibration JSON. No base wire-version change.
 extern const char *const kMsgDAlignment;
-// Client -> server: 0 opt out, 1 opt in, 2 new input. Server -> client: 2 new input.
+// Client -> server: 0 unsupported, 1 supported (legacy 2 input is ignored).
+// Server -> client: 2 new server input, after ASCP=1 and client capability reply.
 extern const char *const kMsgDActivity;
 
 #include <cstdint>

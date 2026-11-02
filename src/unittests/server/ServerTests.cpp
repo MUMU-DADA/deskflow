@@ -632,7 +632,7 @@ void ServerTests::edgeMappingStaysInsideDestination()
     QCOMPARE(test.remote->enteredAt.x(), test.remote->shape.x() + expectedPixel);
 }
 
-void ServerTests::activityRoutesBothWaysWithoutEchoAndStopsWhenDisabled()
+void ServerTests::serverActivityReachesAllClientsAndStopsWhenDisabled()
 {
   class Display : public deskflow::ActivitySync
   {
@@ -668,34 +668,43 @@ void ServerTests::activityRoutesBothWaysWithoutEchoAndStopsWhenDisabled()
   observer->activity = true;
   test.server->adoptClient(observer);
 
-  // A client's own input is meaningful even while the cursor is on the server.
-  QVERIFY(test.events.dispatchEvent(Event(EventTypes::ClientInputActivity, test.remote->getEventTarget())));
-  QCOMPARE(observed->refreshes, 1);
-  QCOMPARE(test.remote->activities, 0); // never echo to the source
-  QCOMPARE(observer->activities, 1);
   test.events.tickTimers();
-  QCOMPARE(test.remote->activities, 0); // receiving did not become outgoing input
+  QCOMPARE(test.remote->activities, 0);
+  QCOMPARE(observer->activities, 0);
 
-  test.motion(true, 51, 50);
   // Reset the rate limiter without touching a real desktop, then record fresh input.
   observed->reset();
   test.motion(true, 52, 50);
   test.events.tickTimers();
   QCOMPARE(test.remote->activities, 1);
-  QCOMPARE(observer->activities, 2);
+  QCOMPARE(observer->activities, 1);
+  QCOMPARE(observed->refreshes, 1);
   test.events.tickTimers();
   QCOMPARE(test.remote->activities, 1); // idle ticks do not renew
 
+  // The same server mouse keeps every client awake while controlling one client.
+  test.switchTo("guard-remote");
+  QCOMPARE(test.remote->enters, 1);
+  observed->reset();
+  test.motion(false, 1, 0);
+  test.events.tickTimers();
+  QCOMPARE(test.remote->activities, 2);
+  QCOMPARE(observer->activities, 2);
+  QCOMPARE(observed->refreshes, 2); // captured server input also stays local activity
+
   observer->activity = false;
-  QVERIFY(test.events.dispatchEvent(Event(EventTypes::ClientInputActivity, test.remote->getEventTarget())));
+  observed->reset();
+  test.motion(false, 1, 0);
+  test.events.tickTimers();
+  QCOMPARE(test.remote->activities, 3);
   QCOMPARE(observer->activities, 2); // disabled peer receives nothing
   Settings::setValue(Settings::Core::SyncUserActivity, false);
-  QVERIFY(test.events.dispatchEvent(Event(EventTypes::ClientInputActivity, test.remote->getEventTarget())));
   observed->reset();
-  test.motion(true, 53, 50);
+  test.motion(false, 1, 0);
   test.events.tickTimers();
-  QCOMPARE(test.remote->activities, 1);
+  QCOMPARE(test.remote->activities, 3);
   QCOMPARE(observer->activities, 2);
+  QCOMPARE(observed->refreshes, 3); // disabled activity did not renew the server either
   QVERIFY(observed->releases > 0);
 }
 

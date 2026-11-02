@@ -71,7 +71,7 @@ This section contains general options it will begin with `[core]`
 | lastVersion   | M.m.p.t           | The version last run used for checking for updates |
 | port          | port #            | Port to use when connecting [default: 24800 |
 | preventSleep  | `true` or `false` | Prevent sleep when Deskflow is active [default: false] |
-| syncUserActivity | `true` or `false` | Keep connected Windows/macOS screens awake only while either computer has input; enable on both ends [default: false]. See [Activity synchronization](ActivitySync.md). |
+| syncUserActivity | `true` or `false` | Server only: keep connected Windows/macOS client screens awake during server keyboard/mouse activity [default: false]. Clients need no separate switch; their local input never keeps other computers awake. See [Activity synchronization](ActivitySync.md). |
 | processMode   | `1` or `0`        | The mode we use to start the process Service or Desktop |
 | computerName  | string            | Name used to identify the computer [default: machine's hostname] |
 | useHooks      | `true` or `false` | If Windows uses hooks or not [default: true] |

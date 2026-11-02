@@ -383,7 +383,7 @@ void ClientProxyTests::activityRejectsInvalidPayload()
   }
 }
 
-void ClientProxyTests::activityReportsWithoutCursorAndCoalesces()
+void ClientProxyTests::legacyClientActivityIsIgnored()
 {
   class Events : public MockEventQueue
   {
@@ -391,8 +391,7 @@ void ClientProxyTests::activityReportsWithoutCursorAndCoalesces()
     int reports = 0;
     void addEvent(Event &&event) override
     {
-      if (event.getType() == EventTypes::ClientInputActivity)
-        ++reports;
+      ++reports;
       Event::deleteData(event);
     }
   } events;
@@ -400,11 +399,14 @@ void ClientProxyTests::activityReportsWithoutCursorAndCoalesces()
   GameGuardProxy proxy("client", stream, &events);
   proxy.setOptions({kOptionActivitySync, 1});
   QVERIFY(proxy.activity(stream, 1));
-  QCOMPARE(events.reports, 0);        // opt-in is not input
-  QVERIFY(proxy.activity(stream, 2)); // no enter(): local keyboard still counts
-  QCOMPARE(events.reports, 1);
+  QCOMPARE(events.reports, 0);
   QVERIFY(proxy.activity(stream, 2));
-  QCOMPARE(events.reports, 1); // bounded event queue under rapid notifications
+  QCOMPARE(events.reports, 0); // legacy local input never reaches the server
+  proxy.enter(10, 20, 1, 0, false);
+  for (int i = 0; i < 100; ++i)
+    QVERIFY(proxy.activity(stream, 2));
+  QCOMPARE(events.reports, 0);          // also ignored while the shared cursor is here
+  QVERIFY(proxy.activitySyncEnabled()); // still accepts server activity
 }
 
 QTEST_MAIN(ClientProxyTests)

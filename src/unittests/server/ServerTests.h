@@ -23,7 +23,7 @@ private Q_SLOTS:
   void calibrationExplicitSwitchRejectsOldSourceHeartbeats();
   void edgeMappingStaysInsideDestination_data();
   void edgeMappingStaysInsideDestination();
-  void activityRoutesBothWaysWithoutEchoAndStopsWhenDisabled();
+  void serverActivityReachesAllClientsAndStopsWhenDisabled();
 
 private:
   Log m_log;

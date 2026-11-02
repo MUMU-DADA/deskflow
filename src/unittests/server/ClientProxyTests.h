@@ -28,7 +28,7 @@ private Q_SLOTS:
   void fullscreenGameGuardResetsOnNewConnection();
   void activityRequiresOptInAndResets();
   void activityRejectsInvalidPayload();
-  void activityReportsWithoutCursorAndCoalesces();
+  void legacyClientActivityIsIgnored();
 
 private:
   Log m_log;

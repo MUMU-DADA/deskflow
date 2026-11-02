@@ -95,10 +95,10 @@
        <item>
         <widget class="QCheckBox" name="cbSyncUserActivity">
          <property name="text">
-          <string>Synchronize activity with connected computers</string>
+          <string>Keep client screens awake during server activity</string>
          </property>
          <property name="toolTip">
-          <string>Keep screens awake while either computer has keyboard or mouse activity. Enable on both computers (Windows and macOS). When all computers are idle, normal display sleep resumes. Turn off "Prevent this computer from going to sleep" to allow idle sleep.</string>
+          <string>Keyboard and mouse activity on this server keeps all connected client screens awake, even while controlling a client. Enable only on the server (Windows and macOS). Local client input does not affect other computers. When server input stops, clients use their normal display sleep settings. Turn off "Prevent this computer from going to sleep" on clients to allow idle sleep.</string>
          </property>
         </widget>
        </item>

@@ -22,12 +22,14 @@ private Q_SLOTS:
     QVERIFY(temporary.isValid());
     Settings::setSettingsFile(temporary.filePath("settings.conf"));
     Settings::setStateFile(temporary.filePath("state.conf"));
+    Settings::setValue(Settings::Core::CoreMode, Settings::CoreMode::Server);
     Settings::setValue(Settings::Core::PreventSleep, false);
     ServerConfig config;
     {
       SettingsDialog dialog(nullptr, config);
       auto *toggle = dialog.findChild<QCheckBox *>("cbSyncUserActivity");
       QVERIFY(toggle);
+      QVERIFY(!toggle->isHidden());
       QVERIFY(!toggle->isChecked());
 #if defined(Q_OS_WIN) || defined(Q_OS_MACOS)
       QVERIFY(toggle->isEnabled());
@@ -58,6 +60,24 @@ private Q_SLOTS:
       QVERIFY(QMetaObject::invokeMethod(&dialog, "accept", Qt::DirectConnection));
       QVERIFY(!Settings::value(Settings::Core::SyncUserActivity).toBool());
     }
+  }
+
+  void clientHasNoActivitySwitchAndPreservesServerPreference()
+  {
+    QTemporaryDir temporary;
+    QVERIFY(temporary.isValid());
+    Settings::setSettingsFile(temporary.filePath("settings.conf"));
+    Settings::setStateFile(temporary.filePath("state.conf"));
+    Settings::setValue(Settings::Core::CoreMode, Settings::CoreMode::Client);
+    Settings::setValue(Settings::Core::SyncUserActivity, true);
+    ServerConfig config;
+    SettingsDialog dialog(nullptr, config);
+    auto *toggle = dialog.findChild<QCheckBox *>("cbSyncUserActivity");
+    QVERIFY(toggle);
+    QVERIFY(toggle->isHidden());
+    toggle->setChecked(false);
+    QVERIFY(QMetaObject::invokeMethod(&dialog, "accept", Qt::DirectConnection));
+    QVERIFY(Settings::value(Settings::Core::SyncUserActivity).toBool());
   }
 };
 

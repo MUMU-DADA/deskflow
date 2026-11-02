@@ -356,7 +356,6 @@ void ClientProxy1_0::resetOptions()
 {
   m_activityAdvertised = false;
   m_activityEnabled = false;
-  m_lastActivity.reset();
   m_alignmentAdvertised = false;
   m_alignmentCapable = false;
   m_alignmentUiReady = false;
@@ -388,7 +387,6 @@ void ClientProxy1_0::setOptions(const OptionsList &options)
     if (options[i] == kOptionActivitySync) {
       m_activityAdvertised = (options[i + 1] == 1);
       m_activityEnabled = false;
-      m_lastActivity.reset();
     } else if (options[i] == kOptionAlignmentCalibration) {
       m_alignmentAdvertised = (options[i + 1] == 1);
     } else if (options[i] == kOptionFullscreenGameGuard) {
@@ -462,17 +460,11 @@ bool ClientProxy1_0::recvActivity()
     return false;
   if (kind < 2) {
     m_activityEnabled = kind == 1;
-    m_lastActivity.reset();
     return true;
   }
-  if (!m_activityEnabled)
-    return false;
-  const auto now = std::chrono::steady_clock::now();
-  if (!m_lastActivity || now - *m_lastActivity >= std::chrono::seconds(1)) {
-    m_lastActivity = now;
-    m_events->addEvent(Event(EventTypes::ClientInputActivity, getEventTarget()));
-  }
-  return true;
+  // Earlier test builds sent local client input as kind 2. Consume it for
+  // compatibility, but it must never refresh this server or any other client.
+  return m_activityEnabled;
 }
 
 bool ClientProxy1_0::recvFullscreenGameGuard()

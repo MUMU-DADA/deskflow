@@ -1777,11 +1777,11 @@ com.example.game
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <source>Synchronize activity with connected computers</source>
+        <source>Keep client screens awake during server activity</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <source>Keep screens awake while either computer has keyboard or mouse activity. Enable on both computers (Windows and macOS). When all computers are idle, normal display sleep resumes. Turn off &quot;Prevent this computer from going to sleep&quot; to allow idle sleep.</source>
+        <source>Keyboard and mouse activity on this server keeps all connected client screens awake, even while controlling a client. Enable only on the server (Windows and macOS). Local client input does not affect other computers. When server input stops, clients use their normal display sleep settings. Turn off &quot;Prevent this computer from going to sleep&quot; on clients to allow idle sleep.</source>
         <translation type="unfinished"></translation>
     </message>
 </context>
